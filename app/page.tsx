@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { SiteHeader } from "@/components/shell/SiteHeader";
+
 import styles from "./page.module.css";
 
 const progress = [
@@ -10,21 +12,8 @@ const progress = [
 
 export default function HomePage() {
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="OAB Questões — início">
-          <span>OAB</span> Questões
-        </Link>
-
-        <nav aria-label="Navegação principal">
-          <Link href="/como-funciona">Como funciona</Link>
-          <Link href="/planos">Planos</Link>
-        </nav>
-
-        <div className={styles.accountLinks}>
-          <Link href="/entrar">Entrar</Link>
-        </div>
-      </header>
+    <main className={styles.page} id="main-content">
+      <SiteHeader />
 
       <section className={styles.hero}>
         <div className={styles.marginNote} aria-hidden="true">

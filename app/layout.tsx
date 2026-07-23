@@ -4,12 +4,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "OAB Questões",
-    template: "%s | OAB Questões",
+    default: "Minha OAB",
+    template: "%s | Minha OAB",
   },
   description:
     "Simulados, questões e estatísticas para uma preparação organizada para a 1ª fase da OAB.",
-  applicationName: "OAB Questões",
+  applicationName: "Minha OAB",
 };
 
 export const viewport: Viewport = {

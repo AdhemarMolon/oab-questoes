@@ -47,8 +47,8 @@ function getInitials(name: string) {
 export function AppHeader({
   accountHref = "/conta",
   actions,
-  brandHref = "/dashboard",
-  brandLabel = "Questões",
+  brandHref = "/",
+  brandLabel = "OAB",
   currentPath,
   mainContentId = "main-content",
   navigation = [],
@@ -60,8 +60,8 @@ export function AppHeader({
         Pular para o conteúdo
       </a>
       <header className={styles.header}>
-        <Link aria-label="Ir para o painel" className={styles.brand} href={brandHref}>
-          <span className={styles.brandMark}>OAB</span>
+        <Link aria-label="Ir para o início" className={styles.brand} href={brandHref}>
+          <span className={styles.brandMark}>Minha</span>
           <span>{brandLabel}</span>
         </Link>
 

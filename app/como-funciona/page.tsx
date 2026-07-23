@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SiteHeader } from "@/components/shell/SiteHeader";
+
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "Como funciona",
   description:
-    "Entenda como usar a OAB Questões para fazer simulados, acompanhar resultados e organizar seus próximos estudos.",
+    "Entenda como usar a Minha OAB para fazer simulados, acompanhar resultados e organizar seus próximos estudos.",
 };
 
 const steps = [
@@ -42,20 +44,7 @@ const facts = [
 export default function HowItWorksPage() {
   return (
     <main className={styles.page} id="main-content">
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="OAB Questões — início">
-          <span>OAB</span> Questões
-        </Link>
-
-        <nav aria-label="Navegação principal">
-          <Link href="/">Início</Link>
-          <Link href="/planos">Planos</Link>
-        </nav>
-
-        <div className={styles.accountLinks}>
-          <Link href="/entrar">Entrar</Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       <section className={styles.workspace}>
         <div className={styles.intro}>

@@ -1,0 +1,60 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.loginLink,
+.adminLink {
+  padding: 7px 10px;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.loginLink:hover,
+.adminLink:hover {
+  color: white;
+  background: var(--brand);
+}
+
+.adminLink {
+  border-color: var(--gold);
+}
+
+.loading {
+  width: 58px;
+  height: 11px;
+  opacity: 0.3;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--text-muted) 35%, transparent),
+    transparent
+  );
+}
+
+@media (max-width: 680px) {
+  .actions {
+    gap: 6px;
+  }
+
+  .loginLink,
+  .adminLink {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loginLink,
+  .adminLink {
+    transition: none;
+  }
+}

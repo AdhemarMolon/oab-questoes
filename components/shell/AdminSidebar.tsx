@@ -43,10 +43,10 @@ export function AdminSidebar({
   return (
     <aside aria-label="Menu administrativo" className={styles.sidebar}>
       <Link className={styles.brand} href={dashboardHref}>
-        <span className={styles.brandMark}>OAB</span>
+        <span className={styles.brandMark}>Minha</span>
         <span>
-          Administração
-          <small>Painel de controle</small>
+          OAB
+          <small>Administração</small>
         </span>
       </Link>
 

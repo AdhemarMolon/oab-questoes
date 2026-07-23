@@ -1,4 +1,4 @@
-# OAB Questões
+# Minha OAB
 
 MVP de uma plataforma de estudos para a 1ª fase da OAB, construído para evoluir para um produto real sem acoplar autenticação, autorização, conteúdo e pagamentos.
 
