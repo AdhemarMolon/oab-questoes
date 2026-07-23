@@ -7,12 +7,14 @@
 
 # Testes
 /coverage/
+/.tmp/
 
 # Arquivos locais
 .DS_Store
 *.log
 *.pem
 *.tsbuildinfo
+/image.png
 
 # Variáveis de ambiente
 .env*

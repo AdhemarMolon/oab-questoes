@@ -1,0 +1,160 @@
+.page {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: clamp(48px, 7vw, 85px) clamp(18px, 5vw, 60px) 90px;
+}
+
+.page > header > p,
+.panelTop > span {
+  margin: 0;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+
+.page > header h1 {
+  margin: 12px 0 9px;
+  font: 600 clamp(43px, 5vw, 61px)/1 var(--font-serif);
+  letter-spacing: -.045em;
+}
+
+.page > header > span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 38px;
+}
+
+.panel {
+  padding: 29px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 23px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile > span {
+  display: grid;
+  place-content: center;
+  width: 52px;
+  height: 52px;
+  color: white;
+  border-radius: 50%;
+  background: var(--brand);
+  font: 600 22px var(--font-serif);
+}
+
+.profile h2 {
+  margin: 0 0 5px;
+  font: 600 23px var(--font-serif);
+}
+
+.profile p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.panel dl {
+  margin: 17px 0 0;
+}
+
+.panel dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5dacb;
+  font-size: 11px;
+}
+
+.panel dt {
+  color: var(--text-muted);
+}
+
+.panel dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.signOut {
+  margin-top: 22px;
+}
+
+.accessPanel {
+  display: flex;
+  flex-direction: column;
+  border-top: 5px solid var(--gold);
+  background: var(--surface-muted);
+}
+
+.panelTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.accessPanel h2 {
+  margin: 35px 0 13px;
+  font: 600 31px/1.1 var(--font-serif);
+}
+
+.accessPanel p {
+  margin: 0 0 15px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.accessPanel small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.accessPanel a {
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: 26px;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.note {
+  display: grid;
+  grid-template-columns: .5fr 1.5fr;
+  gap: 30px;
+  margin-top: 16px;
+  padding: 22px;
+  border-left: 5px solid var(--gold);
+  background: var(--surface-muted);
+}
+
+.note strong {
+  font: 600 18px var(--font-serif);
+}
+
+.note p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media(max-width:700px) {
+  .columns,
+  .note { grid-template-columns: 1fr; }
+}

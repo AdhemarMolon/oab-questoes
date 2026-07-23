@@ -1,0 +1,226 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: 100px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 78px;
+  padding: 0 clamp(22px, 6vw, 90px);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.brand {
+  font: 600 21px var(--font-serif);
+}
+
+.brand strong {
+  margin-right: 7px;
+  padding-bottom: 2px;
+  color: var(--text);
+  border-bottom: 2px solid;
+  font-size: 27px;
+}
+
+.intro {
+  max-width: 960px;
+  padding: clamp(70px, 9vw, 125px) clamp(22px, 7vw, 112px) 60px;
+}
+
+.intro > p,
+.planGrid article > div > span {
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.intro h1 {
+  margin: 18px 0 24px;
+  font: 600 clamp(48px, 6vw, 78px) / 0.98 var(--font-serif);
+  letter-spacing: -0.055em;
+}
+
+.intro > span {
+  display: block;
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 0 clamp(22px, 6vw, 90px);
+}
+
+.planGrid article {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 430px;
+  padding: 30px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.planGrid article.featured {
+  color: white;
+  border-color: var(--brand);
+  background: var(--brand);
+  box-shadow: 0 20px 55px rgba(86, 21, 31, 0.2);
+  transform: translateY(-10px);
+}
+
+.featured > div > span {
+  color: #efc984 !important;
+}
+
+.recommended {
+  position: absolute;
+  top: -29px;
+  right: -1px;
+  left: -1px;
+  padding: 8px 14px;
+  color: var(--brand);
+  background: #e5bd76;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+.planGrid h2 {
+  margin: 12px 0 15px;
+  font: 600 32px/1.1 var(--font-serif);
+}
+
+.planGrid article > div > p {
+  min-height: 72px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.featured > div > p {
+  color: #eadbdd !important;
+}
+
+.planGrid ul {
+  display: grid;
+  gap: 13px;
+  margin: 30px 0;
+  padding: 25px 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  list-style: none;
+}
+
+.featured ul {
+  color: #f0e4e5;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.planGrid li::before {
+  margin-right: 8px;
+  color: var(--success);
+  content: "✓";
+  font-weight: 900;
+}
+
+.featured li::before {
+  color: #efc984;
+}
+
+.planGrid article > a,
+.pending {
+  display: block;
+  margin-top: auto;
+  padding: 14px 16px;
+  color: white;
+  background: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pending {
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  background: transparent;
+}
+
+.featured .pending {
+  color: #f1dfe1;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.faq {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr auto;
+  gap: 40px;
+  align-items: center;
+  margin: 80px clamp(22px, 6vw, 90px) 0;
+  padding: 36px;
+  border-left: 5px solid var(--gold);
+  background: var(--surface-muted);
+}
+
+.faq h2 {
+  margin: 0;
+  font: 600 27px/1.2 var(--font-serif);
+}
+
+.faq p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.faq a {
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .planGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 36px 14px;
+  }
+
+  .faq {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .intro {
+    padding-top: 60px;
+  }
+
+  .planGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .planGrid article.featured {
+    margin-top: 26px;
+    transform: none;
+  }
+
+  .faq {
+    margin-top: 50px;
+    padding: 26px;
+  }
+}

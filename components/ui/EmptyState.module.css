@@ -1,0 +1,57 @@
+.emptyState {
+  align-items: center;
+  background:
+    linear-gradient(rgb(251 246 236 / 92%), rgb(251 246 236 / 92%)),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 23px,
+      rgb(139 30 45 / 6%) 24px
+    );
+  border: 1px dashed var(--oab-border, #c9b99d);
+  border-radius: 6px;
+  color: var(--oab-ink, #24211e);
+  display: flex;
+  flex-direction: column;
+  min-height: 15rem;
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+}
+
+.icon {
+  align-items: center;
+  background: var(--oab-paper, #f2e8d5);
+  border: 1px solid #d4c3a8;
+  border-radius: 50%;
+  color: var(--oab-wine, #8b1e2d);
+  display: flex;
+  font-size: 1.5rem;
+  height: 3.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+  width: 3.5rem;
+}
+
+.title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.3rem, 2vw, 1.65rem);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.description {
+  color: #665e55;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin-top: 0.6rem;
+  max-width: 34rem;
+}
+
+.description p {
+  margin: 0;
+}
+
+.action {
+  margin-top: 1.25rem;
+}

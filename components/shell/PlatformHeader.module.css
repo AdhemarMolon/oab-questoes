@@ -1,0 +1,21 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.actions a {
+  padding: 7px 10px;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 680px) {
+  .actions {
+    display: none;
+  }
+}

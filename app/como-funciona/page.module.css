@@ -1,0 +1,137 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: 90px;
+}
+
+.page > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 78px;
+  padding: 0 clamp(22px, 6vw, 90px);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand {
+  color: var(--brand);
+  font: 600 21px var(--font-serif);
+}
+
+.brand strong {
+  margin-right: 7px;
+  padding-bottom: 2px;
+  color: var(--text);
+  border-bottom: 2px solid;
+  font-size: 27px;
+}
+
+.page nav {
+  display: flex;
+  gap: 25px;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.intro {
+  max-width: 1000px;
+  padding: clamp(75px, 10vw, 140px) clamp(22px, 7vw, 112px) 65px;
+}
+
+.intro > p,
+.detail p {
+  margin: 0;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.intro h1 {
+  margin: 18px 0 26px;
+  font: 600 clamp(49px, 6.6vw, 88px) / 0.97 var(--font-serif);
+  letter-spacing: -0.06em;
+}
+
+.intro > span {
+  display: block;
+  max-width: 670px;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin: 0 clamp(22px, 6vw, 90px);
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.steps article {
+  min-height: 280px;
+  padding: clamp(28px, 3vw, 44px);
+  background: var(--surface);
+}
+
+.steps article > span {
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.steps h2 {
+  margin: 58px 0 15px;
+  font: 600 29px/1.12 var(--font-serif);
+}
+
+.steps p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 35px;
+  align-items: center;
+  margin: 55px clamp(22px, 6vw, 90px) 0;
+  padding: 34px;
+  color: white;
+  background: #29221e;
+}
+
+.detail p {
+  color: #e3bb75;
+}
+
+.detail h2 {
+  margin: 10px 0 0;
+  font: 600 23px/1.2 var(--font-serif);
+}
+
+.detail a {
+  padding: 14px 17px;
+  color: white;
+  background: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 800px) {
+  .steps,
+  .detail {
+    grid-template-columns: 1fr;
+  }
+
+  .steps article {
+    min-height: 220px;
+  }
+}

@@ -1,0 +1,125 @@
+.field {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.label {
+  color: var(--oab-ink, #24211e);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.required {
+  color: var(--oab-wine, #8b1e2d);
+  margin-left: 0.2rem;
+}
+
+.control {
+  appearance: none;
+  background: var(--oab-sheet, #fbf6ec);
+  border: 1px solid var(--oab-border, #c9b99d);
+  border-radius: 4px;
+  color: var(--oab-ink, #24211e);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  min-height: 2.75rem;
+  padding: 0.68rem 0.78rem;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+  width: 100%;
+}
+
+.control::placeholder {
+  color: #7c7165;
+  opacity: 1;
+}
+
+.control:hover:not(:disabled) {
+  border-color: #9d896b;
+}
+
+.control:focus-visible {
+  border-color: var(--oab-wine, #8b1e2d);
+  box-shadow: 0 0 0 3px rgb(139 30 45 / 13%);
+  outline: none;
+}
+
+.control:disabled {
+  background: #e9e1d4;
+  color: #756c62;
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: #9c2f35;
+}
+
+.invalid:focus-visible {
+  border-color: #9c2f35;
+  box-shadow: 0 0 0 3px rgb(156 47 53 / 14%);
+}
+
+.hint,
+.error {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.hint {
+  color: #6f655b;
+}
+
+.error {
+  color: #8a242b;
+  font-weight: 700;
+}
+
+.selectWrap {
+  display: block;
+  position: relative;
+}
+
+.selectWrap::after {
+  border-bottom: 2px solid var(--oab-wine, #8b1e2d);
+  border-right: 2px solid var(--oab-wine, #8b1e2d);
+  content: "";
+  height: 0.45rem;
+  pointer-events: none;
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-65%) rotate(45deg);
+  width: 0.45rem;
+}
+
+.select {
+  padding-right: 2.6rem;
+}
+
+.textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.visuallyHidden {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control {
+    transition: none;
+  }
+}

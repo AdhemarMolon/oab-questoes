@@ -1,0 +1,48 @@
+.status {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 70vh;
+  padding: 30px;
+  text-align: center;
+}
+
+.status h1 {
+  max-width: 650px;
+  margin: 15px 0;
+  font: 600 clamp(35px, 5vw, 53px) / 1.05 var(--font-serif);
+}
+
+.status span,
+.status p {
+  color: var(--text-muted);
+}
+
+.status .label {
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.status button {
+  margin-top: 26px;
+  padding: 13px 20px;
+  color: white;
+  border: 0;
+  background: var(--brand);
+  font-weight: 800;
+}
+
+.loader {
+  width: 35px;
+  height: 35px;
+  border: 4px solid var(--border);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
