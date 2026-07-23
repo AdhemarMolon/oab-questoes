@@ -8,4 +8,6 @@ export {
   type SimulationOptionLabel,
   type SimulationQuestion,
   type SimulationRunnerProps,
+  type SimulationSkipInput,
+  type SimulationSkipResult,
 } from "./SimulationRunner";

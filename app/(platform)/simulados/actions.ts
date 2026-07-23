@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, exists, notExists, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -9,6 +9,8 @@ import type {
   SimulationAnswerInput,
   SimulationAnswerResult,
   SimulationFinishResult,
+  SimulationSkipInput,
+  SimulationSkipResult,
 } from "@/components/study";
 import { getDb } from "@/db";
 import {
@@ -17,7 +19,11 @@ import {
   simulationAttempts,
 } from "@/db/schema";
 import { getUserAccess } from "@/lib/data/access";
-import { createSimulationAttempt, findAttemptItem } from "@/lib/data/simulations";
+import {
+  createSimulationAttempt,
+  finalizeSimulationAttemptForUser,
+  findAttemptItem,
+} from "@/lib/data/simulations";
 import { requireUser } from "@/lib/session";
 
 const startSchema = z.object({
@@ -30,6 +36,15 @@ const answerSchema = z.object({
   itemId: z.string().uuid(),
   selectedAnswer: z.enum(["A", "B", "C", "D"]),
 });
+
+const skipSchema = z.object({
+  attemptId: z.string().uuid(),
+  itemId: z.string().uuid(),
+});
+
+function attemptExpired(expiresAt: Date | null) {
+  return Boolean(expiresAt && expiresAt.getTime() <= Date.now());
+}
 
 function publicStartError(error: unknown) {
   if (error instanceof Error) {
@@ -92,6 +107,12 @@ export async function answerSimulationQuestion(
     if (item.status !== "IN_PROGRESS") {
       return { ok: false, error: "Esta tentativa já foi encerrada." };
     }
+    if (attemptExpired(item.expiresAt)) {
+      return {
+        ok: false,
+        error: "O tempo deste simulado terminou. Finalize para consultar o resultado.",
+      };
+    }
     if (!(parsed.data.selectedAnswer in item.snapshot.options)) {
       return { ok: false, error: "Alternativa indisponível nesta questão." };
     }
@@ -101,46 +122,90 @@ export async function answerSimulationQuestion(
 
     const isCorrect = item.snapshot.annulled || item.correctAnswer === parsed.data.selectedAnswer;
     const database = getDb();
-
-    await database
-      .insert(simulationAnswers)
-      .values({
-        attemptQuestionId: item.itemId,
-        selectedAnswer: parsed.data.selectedAnswer,
-        isCorrect,
+    const lockAttempt = database
+      .select({ id: simulationAttempts.id })
+      .from(simulationAttempts)
+      .where(
+        and(
+          eq(simulationAttempts.id, parsed.data.attemptId),
+          eq(simulationAttempts.userId, session.user.id),
+        ),
+      )
+      .for("update");
+    const answerSource = database
+      .select({
+        attemptQuestionId: simulationAttemptQuestions.id,
+        selectedAnswer: sql<string>`${parsed.data.selectedAnswer}`.as(
+          "selected_answer",
+        ),
+        isCorrect: sql<boolean>`${isCorrect}`.as("is_correct"),
       })
-      .onConflictDoNothing({ target: simulationAnswers.attemptQuestionId });
+      .from(simulationAttemptQuestions)
+      .innerJoin(
+        simulationAttempts,
+        eq(simulationAttempts.id, simulationAttemptQuestions.attemptId),
+      )
+      .where(
+        and(
+          eq(simulationAttemptQuestions.id, item.itemId),
+          eq(simulationAttemptQuestions.attemptId, parsed.data.attemptId),
+          eq(simulationAttempts.userId, session.user.id),
+          eq(simulationAttempts.status, "IN_PROGRESS"),
+          sql`(
+            ${simulationAttempts.expiresAt} is null
+            or ${simulationAttempts.expiresAt} > current_timestamp
+          )`,
+        ),
+      );
+    const storedAnswerQuery = database
+      .select({
+        selectedAnswer: simulationAnswers.selectedAnswer,
+      })
+      .from(simulationAnswers)
+      .where(eq(simulationAnswers.attemptQuestionId, item.itemId))
+      .limit(1);
+    const totalQuery = database
+      .select({ answered: count() })
+      .from(simulationAnswers)
+      .innerJoin(
+        simulationAttemptQuestions,
+        eq(simulationAttemptQuestions.id, simulationAnswers.attemptQuestionId),
+      )
+      .where(eq(simulationAttemptQuestions.attemptId, parsed.data.attemptId));
 
-    const [storedAnswers, totals] = await Promise.all([
+    const [, , , storedAnswers, totals] = await database.batch([
+      lockAttempt,
       database
-        .select({
-          selectedAnswer: simulationAnswers.selectedAnswer,
-          isCorrect: simulationAnswers.isCorrect,
-        })
-        .from(simulationAnswers)
-        .where(eq(simulationAnswers.attemptQuestionId, item.itemId))
-        .limit(1),
+        .insert(simulationAnswers)
+        .select(answerSource)
+        .onConflictDoNothing({ target: simulationAnswers.attemptQuestionId }),
       database
-        .select({ answered: count() })
-        .from(simulationAnswers)
-        .innerJoin(
-          simulationAttemptQuestions,
-          eq(simulationAttemptQuestions.id, simulationAnswers.attemptQuestionId),
-        )
-        .where(eq(simulationAttemptQuestions.attemptId, parsed.data.attemptId)),
+        .update(simulationAttemptQuestions)
+        .set({ skippedAt: null })
+        .where(
+          and(
+            eq(simulationAttemptQuestions.id, item.itemId),
+            exists(storedAnswerQuery),
+          ),
+        ),
+      storedAnswerQuery,
+      totalQuery,
     ]);
 
     const stored = storedAnswers[0];
     const answeredCount = Number(totals[0]?.answered ?? 0);
-    if (!stored) return { ok: false, error: "Não foi possível confirmar a resposta." };
+    if (!stored) {
+      return {
+        ok: false,
+        error:
+          "A tentativa foi encerrada antes de salvar esta resposta. Consulte o resultado.",
+      };
+    }
 
     revalidatePath(`/simulados/${parsed.data.attemptId}`);
     return {
       ok: true,
       selectedAnswer: stored.selectedAnswer as "A" | "B" | "C" | "D",
-      correctAnswer: item.correctAnswer as "A" | "B" | "C" | "D" | null,
-      isCorrect: stored.isCorrect,
-      annulled: item.snapshot.annulled,
       answeredCount,
       total: item.totalQuestions,
       completed: answeredCount >= item.totalQuestions,
@@ -150,71 +215,123 @@ export async function answerSimulationQuestion(
   }
 }
 
+export async function skipSimulationQuestion(
+  input: SimulationSkipInput,
+): Promise<SimulationSkipResult> {
+  const parsed = skipSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Questão inválida." };
+
+  try {
+    const session = await requireUser();
+    const item = await findAttemptItem({
+      userId: session.user.id,
+      attemptId: parsed.data.attemptId,
+      itemId: parsed.data.itemId,
+    });
+
+    if (!item) return { ok: false, error: "Questão não encontrada nesta tentativa." };
+    if (item.status !== "IN_PROGRESS") {
+      return { ok: false, error: "Esta tentativa já foi encerrada." };
+    }
+    if (attemptExpired(item.expiresAt)) {
+      return {
+        ok: false,
+        error: "O tempo deste simulado terminou. Finalize para consultar o resultado.",
+      };
+    }
+
+    const database = getDb();
+    const existingAnswerQuery = database
+      .select({ itemId: simulationAnswers.attemptQuestionId })
+      .from(simulationAnswers)
+      .where(eq(simulationAnswers.attemptQuestionId, item.itemId))
+      .limit(1);
+    const eligibleAttempt = database
+      .select({ id: simulationAttempts.id })
+      .from(simulationAttempts)
+      .where(
+        and(
+          eq(simulationAttempts.id, parsed.data.attemptId),
+          eq(simulationAttempts.userId, session.user.id),
+          eq(simulationAttempts.status, "IN_PROGRESS"),
+          sql`(
+            ${simulationAttempts.expiresAt} is null
+            or ${simulationAttempts.expiresAt} > current_timestamp
+          )`,
+        ),
+      );
+    const [lockedAttempts, updatedItems, existingAnswers] =
+      await database.batch([
+        database
+          .select({ id: simulationAttempts.id })
+          .from(simulationAttempts)
+          .where(
+            and(
+              eq(simulationAttempts.id, parsed.data.attemptId),
+              eq(simulationAttempts.userId, session.user.id),
+            ),
+          )
+          .for("update"),
+        database
+          .update(simulationAttemptQuestions)
+          .set({ skippedAt: new Date() })
+          .where(
+            and(
+              eq(simulationAttemptQuestions.id, item.itemId),
+              eq(
+                simulationAttemptQuestions.attemptId,
+                parsed.data.attemptId,
+              ),
+              exists(eligibleAttempt),
+              notExists(existingAnswerQuery),
+            ),
+          )
+          .returning({ id: simulationAttemptQuestions.id }),
+        existingAnswerQuery,
+      ]);
+
+    if (existingAnswers[0]) return { ok: true };
+    if (!lockedAttempts[0] || !updatedItems[0]) {
+      return {
+        ok: false,
+        error: "A tentativa foi encerrada antes de registrar esta questão como pulada.",
+      };
+    }
+
+    revalidatePath(`/simulados/${parsed.data.attemptId}`);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Não foi possível pular esta questão. Tente novamente." };
+  }
+}
+
 export async function finishSimulationAttempt(attemptId: string): Promise<SimulationFinishResult> {
   const parsed = z.string().uuid().safeParse(attemptId);
   if (!parsed.success) return { ok: false, error: "Tentativa inválida." };
 
   try {
     const session = await requireUser();
-    const database = getDb();
-    const attempts = await database
-      .select({
-        id: simulationAttempts.id,
-        status: simulationAttempts.status,
-        totalQuestions: simulationAttempts.totalQuestions,
-      })
-      .from(simulationAttempts)
-      .where(
-        and(
-          eq(simulationAttempts.id, parsed.data),
-          eq(simulationAttempts.userId, session.user.id),
-        ),
-      )
-      .limit(1);
-    const attempt = attempts[0];
+    const result = await finalizeSimulationAttemptForUser({
+      userId: session.user.id,
+      attemptId: parsed.data,
+    });
 
-    if (!attempt) return { ok: false, error: "Tentativa não encontrada." };
-    if (attempt.status === "SUBMITTED") {
-      return { ok: true, redirectTo: `/simulados/${attempt.id}/resultado` };
+    if (!result.ok && result.reason === "NOT_FOUND") {
+      return { ok: false, error: "Tentativa não encontrada." };
     }
-    if (attempt.status !== "IN_PROGRESS") {
-      return { ok: false, error: "Esta tentativa não pode mais ser finalizada." };
-    }
-
-    const totals = await database
-      .select({
-        answered: count(),
-        correct: sql<number>`count(*) filter (where ${simulationAnswers.isCorrect} = true)`,
-      })
-      .from(simulationAnswers)
-      .innerJoin(
-        simulationAttemptQuestions,
-        eq(simulationAttemptQuestions.id, simulationAnswers.attemptQuestionId),
-      )
-      .where(eq(simulationAttemptQuestions.attemptId, attempt.id));
-    const answered = Number(totals[0]?.answered ?? 0);
-    const correct = Number(totals[0]?.correct ?? 0);
-
-    if (answered < attempt.totalQuestions) {
+    if (!result.ok) {
       return {
         ok: false,
-        error: `Responda as ${attempt.totalQuestions - answered} questões pendentes antes de finalizar.`,
+        error: "Esta tentativa não pode mais ser finalizada.",
       };
     }
 
-    await database
-      .update(simulationAttempts)
-      .set({ status: "SUBMITTED", correctAnswers: correct, submittedAt: new Date() })
-      .where(
-        and(
-          eq(simulationAttempts.id, attempt.id),
-          eq(simulationAttempts.status, "IN_PROGRESS"),
-        ),
-      );
-
     revalidatePath("/painel");
     revalidatePath("/simulados");
-    return { ok: true, redirectTo: `/simulados/${attempt.id}/resultado` };
+    return {
+      ok: true,
+      redirectTo: `/simulados/${result.attemptId}/resultado`,
+    };
   } catch {
     return { ok: false, error: "Não foi possível finalizar o simulado agora." };
   }

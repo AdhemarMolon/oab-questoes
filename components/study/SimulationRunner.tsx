@@ -1,8 +1,14 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { Badge, Button, EmptyState } from "@/components/ui";
+import {
+  formatSimulationTime,
+  type SimulationClock,
+} from "@/lib/simulation-attempt";
+
 import styles from "./SimulationRunner.module.css";
 
 export type SimulationOptionLabel = "A" | "B" | "C" | "D";
@@ -26,6 +32,7 @@ export interface SimulationQuestion {
   examLabel: string;
   stem: string;
   options: readonly SimulationOption[];
+  skipped?: boolean;
   existingAnswer?: SimulationExistingAnswer;
 }
 
@@ -47,6 +54,16 @@ export interface SimulationAnswerResult {
   completed?: boolean;
 }
 
+export interface SimulationSkipInput {
+  attemptId: string;
+  itemId: string;
+}
+
+export interface SimulationSkipResult {
+  ok: boolean;
+  error?: string;
+}
+
 export interface SimulationFinishResult {
   ok: boolean;
   error?: string;
@@ -56,14 +73,17 @@ export interface SimulationFinishResult {
 export interface SimulationRunnerProps {
   attemptId: string;
   questions: readonly SimulationQuestion[];
+  hasTimeLimit: boolean;
+  initialTimeSeconds: number;
   answerAction: (
     input: SimulationAnswerInput,
   ) => Promise<SimulationAnswerResult>;
+  skipAction: (input: SimulationSkipInput) => Promise<SimulationSkipResult>;
   finishAction: (attemptId: string) => Promise<SimulationFinishResult>;
 }
 
 type StoredAnswer = SimulationExistingAnswer;
-type RunnerView = "questions" | "summary";
+type FinishTrigger = "manual" | "timeout";
 
 function isOptionLabel(value: unknown): value is SimulationOptionLabel {
   return value === "A" || value === "B" || value === "C" || value === "D";
@@ -101,40 +121,113 @@ function getInitialSelections(questions: readonly SimulationQuestion[]) {
   );
 }
 
-function validProgressTotal(value: number | undefined, fallback: number) {
-  if (!Number.isFinite(value) || !value || value < 1) return fallback;
-  return Math.trunc(value);
+function getInitialSkippedItems(questions: readonly SimulationQuestion[]) {
+  return new Set(
+    questions
+      .filter((question) => question.skipped && !question.existingAnswer)
+      .map((question) => question.itemId),
+  );
 }
 
-function validAnsweredCount(
-  value: number | undefined,
-  fallback: number,
-  total: number,
-) {
-  if (!Number.isFinite(value) || value === undefined) {
-    return Math.min(total, Math.max(0, fallback));
-  }
-  return Math.min(total, Math.max(0, Math.trunc(value)));
-}
-
-function safeErrorMessage(error?: string) {
-  return error?.trim() || "Não foi possível salvar sua resposta. Tente novamente.";
+function safeErrorMessage(error?: string, fallback?: string) {
+  return (
+    error?.trim() ||
+    fallback ||
+    "Não foi possível concluir esta operação. Tente novamente."
+  );
 }
 
 function isSafeInternalPath(path?: string) {
   return Boolean(path && path.startsWith("/") && !path.startsWith("//"));
 }
 
+function useAttemptClock(input: {
+  countdown: boolean;
+  initialTimeSeconds: number;
+  onExpire: () => void;
+}) {
+  const onExpireRef = useRef(input.onExpire);
+  const expirationNotified = useRef(false);
+  const [clock, setClock] = useState<SimulationClock>(() => ({
+    mode: input.countdown ? "countdown" : "elapsed",
+    seconds: Math.max(0, Math.trunc(input.initialTimeSeconds)),
+    expired: Boolean(input.countdown && input.initialTimeSeconds <= 0),
+  }));
+
+  useEffect(() => {
+    onExpireRef.current = input.onExpire;
+  }, [input.onExpire]);
+
+  useEffect(() => {
+    const initialSeconds = Math.max(
+      0,
+      Math.trunc(input.initialTimeSeconds),
+    );
+    const startedAt = performance.now();
+
+    function updateClock() {
+      const elapsedSeconds = Math.max(
+        0,
+        Math.floor((performance.now() - startedAt) / 1000),
+      );
+      const seconds = input.countdown
+        ? Math.max(0, initialSeconds - elapsedSeconds)
+        : initialSeconds + elapsedSeconds;
+      const nextClock: SimulationClock = {
+        mode: input.countdown ? "countdown" : "elapsed",
+        seconds,
+        expired: input.countdown && seconds === 0,
+      };
+      setClock(nextClock);
+
+      if (
+        nextClock.mode === "countdown" &&
+        nextClock.expired &&
+        !expirationNotified.current
+      ) {
+        expirationNotified.current = true;
+        onExpireRef.current();
+      }
+    }
+
+    updateClock();
+    const interval = window.setInterval(updateClock, 1000);
+    return () => window.clearInterval(interval);
+  }, [input.countdown, input.initialTimeSeconds]);
+
+  return clock;
+}
+
+function navigationLabel(input: {
+  number: number;
+  answered: boolean;
+  skipped: boolean;
+  current: boolean;
+}) {
+  const status = input.answered
+    ? "respondida"
+    : input.skipped
+      ? "pulada"
+      : "sem resposta";
+  return `Questão ${input.number}: ${status}${input.current ? ", atual" : ""}`;
+}
+
 export function SimulationRunner({
   answerAction,
   attemptId,
   finishAction,
+  hasTimeLimit,
+  initialTimeSeconds,
   questions,
+  skipAction,
 }: SimulationRunnerProps) {
   const router = useRouter();
   const idPrefix = useId();
   const submissionLock = useRef(false);
+  const skipLock = useRef(false);
   const finishLock = useRef(false);
+  const finishDialogRef = useRef<HTMLDivElement>(null);
+  const finishDialogTriggerRef = useRef<HTMLElement | null>(null);
   const [sessionQuestions] = useState(() => cloneQuestions(questions));
   const [answers, setAnswers] = useState<Record<string, StoredAnswer>>(() =>
     getInitialAnswers(sessionQuestions),
@@ -142,32 +235,49 @@ export function SimulationRunner({
   const [selections, setSelections] = useState<
     Partial<Record<string, SimulationOptionLabel>>
   >(() => getInitialSelections(sessionQuestions));
+  const [skippedItems, setSkippedItems] = useState(() =>
+    getInitialSkippedItems(sessionQuestions),
+  );
   const [currentIndex, setCurrentIndex] = useState(() => {
     const unansweredIndex = sessionQuestions.findIndex(
+      (question) => !question.existingAnswer && !question.skipped,
+    );
+    if (unansweredIndex >= 0) return unansweredIndex;
+    const skippedIndex = sessionQuestions.findIndex(
       (question) => !question.existingAnswer,
     );
-    return unansweredIndex >= 0 ? unansweredIndex : 0;
+    return skippedIndex >= 0 ? skippedIndex : 0;
   });
-  const [view, setView] = useState<RunnerView>(() =>
-    sessionQuestions.length > 0 &&
-    sessionQuestions.every((question) => Boolean(question.existingAnswer))
-      ? "summary"
-      : "questions",
-  );
-  const [answeredCount, setAnsweredCount] = useState(
-    () => Object.keys(getInitialAnswers(sessionQuestions)).length,
-  );
-  const [progressTotal, setProgressTotal] = useState(sessionQuestions.length);
-  const [completed, setCompleted] = useState(
-    () =>
-      sessionQuestions.length > 0 &&
-      sessionQuestions.every((question) => Boolean(question.existingAnswer)),
-  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const [finishTrigger, setFinishTrigger] = useState<FinishTrigger | null>(
+    null,
+  );
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [navigatorOpen, setNavigatorOpen] = useState(false);
+
+  const clock = useAttemptClock({
+    countdown: hasTimeLimit,
+    initialTimeSeconds,
+    onExpire: () => {
+      void finishSimulation("timeout");
+    },
+  });
+
+  useEffect(() => {
+    if (showFinishConfirm) {
+      finishDialogRef.current?.focus();
+      return;
+    }
+    if (!isFinishing && finishDialogTriggerRef.current) {
+      finishDialogTriggerRef.current.focus();
+      finishDialogTriggerRef.current = null;
+    }
+  }, [isFinishing, showFinishConfirm]);
 
   if (!sessionQuestions.length) {
     return (
@@ -182,17 +292,82 @@ export function SimulationRunner({
   const currentQuestion = sessionQuestions[currentIndex];
   const currentAnswer = answers[currentQuestion.itemId];
   const selectedAnswer = selections[currentQuestion.itemId];
-  const locallyAnswered = Object.keys(answers).length;
-  const allLocallyAnswered = locallyAnswered >= sessionQuestions.length;
-  const canShowSummary = completed || allLocallyAnswered;
-  const progressPercentage = progressTotal
-    ? Math.round((answeredCount / progressTotal) * 100)
+  const answeredCount = Object.keys(answers).length;
+  const skippedCount = sessionQuestions.filter(
+    (question) =>
+      skippedItems.has(question.itemId) && !answers[question.itemId],
+  ).length;
+  const unansweredCount = Math.max(
+    0,
+    sessionQuestions.length - answeredCount - skippedCount,
+  );
+  const pendingAtFinish = Math.max(
+    0,
+    sessionQuestions.length - answeredCount,
+  );
+  const progressPercentage = sessionQuestions.length
+    ? Math.round((answeredCount / sessionQuestions.length) * 100)
     : 0;
   const feedbackId = `${idPrefix}-feedback`;
   const radioName = `${idPrefix}-${currentQuestion.itemId}`;
+  const clockCritical =
+    clock.mode === "countdown" && clock.seconds > 0 && clock.seconds <= 300;
+
+  function clearMessages() {
+    setAnswerError(null);
+    setFinishError(null);
+  }
+
+  function openFinishDialog() {
+    finishDialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setFinishError(null);
+    setShowFinishConfirm(true);
+  }
+
+  function handleFinishDialogKeyDown(
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) {
+    if (event.key === "Escape" && !isFinishing) {
+      setShowFinishConfirm(false);
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = finishDialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable?.length) {
+      event.preventDefault();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (
+      event.shiftKey &&
+      (document.activeElement === first ||
+        document.activeElement === finishDialogRef.current)
+    ) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   function selectAnswer(option: SimulationOptionLabel) {
-    if (currentAnswer || isSubmitting) return;
+    if (
+      currentAnswer ||
+      isSubmitting ||
+      isSkipping ||
+      clock.expired
+    ) {
+      return;
+    }
     setAnswerError(null);
     setSelections((current) => ({
       ...current,
@@ -205,7 +380,9 @@ export function SimulationRunner({
       !selectedAnswer ||
       currentAnswer ||
       submissionLock.current ||
-      isSubmitting
+      isSubmitting ||
+      isSkipping ||
+      clock.expired
     ) {
       return;
     }
@@ -222,34 +399,24 @@ export function SimulationRunner({
       });
 
       if (!result.ok) {
-        setAnswerError(safeErrorMessage(result.error));
+        setAnswerError(
+          safeErrorMessage(
+            result.error,
+            "Não foi possível salvar sua resposta. Tente novamente.",
+          ),
+        );
         return;
       }
 
       const confirmedSelection = isOptionLabel(result.selectedAnswer)
         ? result.selectedAnswer
         : selectedAnswer;
-      const confirmedCorrectAnswer = isOptionLabel(result.correctAnswer)
-        ? result.correctAnswer
-        : null;
-      const annulled = Boolean(result.annulled);
       const confirmedAnswer: StoredAnswer = {
         selectedAnswer: confirmedSelection,
-        correctAnswer: confirmedCorrectAnswer,
-        isCorrect: annulled
-          ? null
-          : typeof result.isCorrect === "boolean"
-            ? result.isCorrect
-            : confirmedCorrectAnswer
-              ? confirmedSelection === confirmedCorrectAnswer
-              : null,
-        annulled,
+        correctAnswer: null,
+        isCorrect: null,
+        annulled: false,
       };
-      const nextLocalCount = Math.min(
-        sessionQuestions.length,
-        Object.keys(answers).length + 1,
-      );
-      const nextTotal = validProgressTotal(result.total, progressTotal);
 
       setAnswers((current) => ({
         ...current,
@@ -259,13 +426,15 @@ export function SimulationRunner({
         ...current,
         [currentQuestion.itemId]: confirmedSelection,
       }));
-      setProgressTotal(nextTotal);
-      setAnsweredCount(
-        validAnsweredCount(result.answeredCount, nextLocalCount, nextTotal),
-      );
-      setCompleted(result.completed ?? nextLocalCount >= sessionQuestions.length);
+      setSkippedItems((current) => {
+        const next = new Set(current);
+        next.delete(currentQuestion.itemId);
+        return next;
+      });
     } catch {
-      setAnswerError("Não foi possível salvar sua resposta. Verifique sua conexão e tente novamente.");
+      setAnswerError(
+        "Não foi possível salvar sua resposta. Verifique sua conexão e tente novamente.",
+      );
     } finally {
       submissionLock.current = false;
       setIsSubmitting(false);
@@ -273,41 +442,101 @@ export function SimulationRunner({
   }
 
   function goToQuestion(index: number) {
-    if (isSubmitting || index < 0 || index >= sessionQuestions.length) return;
-    setAnswerError(null);
+    if (
+      isSubmitting ||
+      isSkipping ||
+      index < 0 ||
+      index >= sessionQuestions.length
+    ) {
+      return;
+    }
+    clearMessages();
     setCurrentIndex(index);
+    setNavigatorOpen(false);
   }
 
   function goToNext() {
-    if (currentIndex < sessionQuestions.length - 1) {
-      goToQuestion(currentIndex + 1);
+    goToQuestion((currentIndex + 1) % sessionQuestions.length);
+  }
+
+  async function skipCurrentQuestion() {
+    if (
+      currentAnswer ||
+      skipLock.current ||
+      isSkipping ||
+      isSubmitting ||
+      clock.expired
+    ) {
       return;
     }
-    if (canShowSummary) {
-      setView("summary");
-      return;
-    }
-    const pendingIndex = sessionQuestions.findIndex(
-      (question) => !answers[question.itemId],
-    );
-    if (pendingIndex >= 0 && pendingIndex !== currentIndex) {
-      goToQuestion(pendingIndex);
+
+    skipLock.current = true;
+    setIsSkipping(true);
+    setAnswerError(null);
+
+    try {
+      const result = await skipAction({
+        attemptId,
+        itemId: currentQuestion.itemId,
+      });
+
+      if (!result.ok) {
+        setAnswerError(
+          safeErrorMessage(
+            result.error,
+            "Não foi possível pular esta questão. Tente novamente.",
+          ),
+        );
+        return;
+      }
+
+      setSkippedItems((current) => {
+        const next = new Set(current);
+        next.add(currentQuestion.itemId);
+        return next;
+      });
+      setSelections((current) => {
+        const next = { ...current };
+        delete next[currentQuestion.itemId];
+        return next;
+      });
+      setCurrentIndex((currentIndex + 1) % sessionQuestions.length);
+    } catch {
+      setAnswerError(
+        "Não foi possível pular esta questão. Verifique sua conexão e tente novamente.",
+      );
+    } finally {
+      skipLock.current = false;
+      setIsSkipping(false);
     }
   }
 
-  async function finishSimulation() {
-    if (!canShowSummary || finishLock.current || isFinishing || finished) return;
+  async function finishSimulation(trigger: FinishTrigger) {
+    if (finished || finishLock.current || isFinishing) return;
+
+    if (submissionLock.current || skipLock.current) {
+      if (trigger === "timeout") {
+        window.setTimeout(() => {
+          void finishSimulation("timeout");
+        }, 350);
+      }
+      return;
+    }
 
     finishLock.current = true;
+    setFinishTrigger(trigger);
     setIsFinishing(true);
+    setShowFinishConfirm(false);
     setFinishError(null);
 
     try {
       const result = await finishAction(attemptId);
       if (!result.ok) {
         setFinishError(
-          result.error?.trim() ||
+          safeErrorMessage(
+            result.error,
             "Não foi possível finalizar o simulado. Tente novamente.",
+          ),
         );
         return;
       }
@@ -326,260 +555,388 @@ export function SimulationRunner({
     }
   }
 
-  if (view === "summary") {
-    const answerValues = Object.values(answers);
-    const annulledCount = answerValues.filter((answer) => answer.annulled).length;
-    const correctCount = answerValues.filter(
-      (answer) => !answer.annulled && answer.isCorrect === true,
-    ).length;
-    const incorrectCount = answerValues.filter(
-      (answer) => !answer.annulled && answer.isCorrect === false,
-    ).length;
-    const pendingCount = Math.max(0, progressTotal - answeredCount);
-
-    return (
-      <section aria-labelledby={`${idPrefix}-summary-title`} className={styles.summary}>
-        <div aria-hidden="true" className={styles.summarySeal}>✓</div>
-        <p className={styles.eyebrow}>Resumo da tentativa</p>
-        <h1 id={`${idPrefix}-summary-title`}>
-          {finished ? "Simulado finalizado" : "Respostas concluídas"}
-        </h1>
-        <p className={styles.summaryLead}>
-          {finished
-            ? "Seu resultado foi registrado. Você ainda pode revisar cada questão desta tentativa."
-            : "Confira seu desempenho e finalize para registrar a conclusão desta tentativa."}
-        </p>
-
-        <dl className={styles.resultGrid}>
-          <div className={styles.resultPrimary}>
-            <dt>Aproveitamento</dt>
-            <dd>
-              {correctCount + incorrectCount
-                ? Math.round((correctCount / (correctCount + incorrectCount)) * 100)
-                : 0}
-              <small>%</small>
-            </dd>
-          </div>
-          <div>
-            <dt>Acertos</dt>
-            <dd>{correctCount}</dd>
-          </div>
-          <div>
-            <dt>Erros</dt>
-            <dd>{incorrectCount}</dd>
-          </div>
-          <div>
-            <dt>Anuladas</dt>
-            <dd>{annulledCount}</dd>
-          </div>
-          <div>
-            <dt>Pendentes</dt>
-            <dd>{pendingCount}</dd>
-          </div>
-        </dl>
-
-        {finishError ? <p className={styles.error} role="alert">{finishError}</p> : null}
-        {finished ? (
-          <p aria-live="polite" className={styles.finishSuccess} role="status">
-            Sua tentativa foi finalizada e salva com sucesso.
-          </p>
-        ) : null}
-
-        <div className={styles.summaryActions}>
-          <Button
-            disabled={isFinishing}
-            onClick={() => {
-              setFinishError(null);
-              setView("questions");
-              setCurrentIndex(0);
-            }}
-            variant="secondary"
-          >
-            Revisar questões
-          </Button>
-          <Button
-            disabled={!canShowSummary || finished}
-            loading={isFinishing}
-            loadingLabel="Finalizando simulado"
-            onClick={finishSimulation}
-          >
-            {finished ? "Finalizado" : "Finalizar simulado"}
-          </Button>
-        </div>
-      </section>
-    );
-  }
-
-  const lastQuestion = currentIndex === sessionQuestions.length - 1;
-  const pendingIndex = lastQuestion
-    ? sessionQuestions.findIndex((question) => !answers[question.itemId])
-    : -1;
-  const nextDisabled =
-    isSubmitting ||
-    (lastQuestion && !canShowSummary && (pendingIndex < 0 || pendingIndex === currentIndex));
-  const nextLabel = lastQuestion
-    ? canShowSummary
-      ? "Ver resumo"
-      : "Ir para pendente"
-    : "Próxima";
-
   return (
-    <section aria-labelledby={`${idPrefix}-question-title`} className={styles.runner}>
-      <header className={styles.runnerHeader}>
-        <div>
-          <p className={styles.eyebrow}>Simulado em andamento</p>
-          <div className={styles.questionMeta}>
-            <Badge variant="admin">{currentQuestion.examLabel}</Badge>
-            <Badge>{currentQuestion.subject}</Badge>
+    <>
+      <section
+        aria-labelledby={`${idPrefix}-question-title`}
+        className={styles.runner}
+        inert={showFinishConfirm ? true : undefined}
+      >
+        <div className={styles.runnerLayout}>
+          <div className={styles.mainColumn}>
+            <header className={styles.runnerHeader}>
+              <div>
+                <p className={styles.eyebrow}>Simulado em andamento</p>
+                <div className={styles.questionMeta}>
+                  <Badge variant="admin">{currentQuestion.examLabel}</Badge>
+                  <Badge>{currentQuestion.subject}</Badge>
+                </div>
+              </div>
+              <span className={styles.questionPosition}>
+                <span>Questão</span> <strong>{currentIndex + 1}</strong>{" "}
+                <span>de {sessionQuestions.length}</span>
+              </span>
+            </header>
+
+            <div className={styles.progressBlock}>
+              <div className={styles.progressCopy}>
+                <span>{answeredCount} respondidas</span>
+                <span>
+                  {skippedCount} puladas · {unansweredCount} sem resposta
+                </span>
+              </div>
+              <div
+                aria-label={`${answeredCount} de ${sessionQuestions.length} questões respondidas`}
+                aria-valuemax={sessionQuestions.length}
+                aria-valuemin={0}
+                aria-valuenow={answeredCount}
+                className={styles.progressTrack}
+                role="progressbar"
+              >
+                <span
+                  style={{ width: `${Math.min(100, progressPercentage)}%` }}
+                />
+              </div>
+            </div>
+
+            <article className={styles.questionCard}>
+              <div className={styles.questionNumber} aria-hidden="true">
+                {String(currentQuestion.position).padStart(2, "0")}.
+              </div>
+              <div className={styles.questionBody}>
+                <h1 className={styles.stem} id={`${idPrefix}-question-title`}>
+                  {currentQuestion.stem}
+                </h1>
+
+                <fieldset
+                  aria-describedby={currentAnswer ? feedbackId : undefined}
+                  className={styles.options}
+                  disabled={
+                    Boolean(currentAnswer) ||
+                    isSubmitting ||
+                    isSkipping ||
+                    clock.expired
+                  }
+                >
+                  <legend className={styles.srOnly}>
+                    Escolha uma alternativa
+                  </legend>
+                  {currentQuestion.options.map((option) => {
+                    const selected = selectedAnswer === option.label;
+                    const optionClasses = [
+                      styles.option,
+                      selected && styles.optionSelected,
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    return (
+                      <label className={optionClasses} key={option.label}>
+                        <input
+                          checked={selected}
+                          className={styles.radio}
+                          name={radioName}
+                          onChange={() => selectAnswer(option.label)}
+                          type="radio"
+                          value={option.label}
+                        />
+                        <span aria-hidden="true" className={styles.optionLetter}>
+                          {option.label}
+                        </span>
+                        <span>{option.text}</span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+
+                {currentAnswer ? (
+                  <div
+                    aria-live="polite"
+                    className={styles.feedback}
+                    id={feedbackId}
+                    role="status"
+                  >
+                    <strong>Resposta registrada</strong>
+                    <span>
+                      A correção será calculada somente após a finalização do
+                      simulado.
+                    </span>
+                  </div>
+                ) : null}
+
+                {clock.expired ? (
+                  <p className={styles.timeWarning} role="status">
+                    O tempo terminou. Estamos finalizando sua tentativa com as
+                    respostas já salvas.
+                  </p>
+                ) : null}
+                {answerError ? (
+                  <p className={styles.error} role="alert">
+                    {answerError}
+                  </p>
+                ) : null}
+              </div>
+            </article>
+
+            <footer className={styles.runnerFooter}>
+              <Button
+                disabled={
+                  currentIndex === 0 ||
+                  isSubmitting ||
+                  isSkipping ||
+                  isFinishing
+                }
+                onClick={() => goToQuestion(currentIndex - 1)}
+                variant="ghost"
+              >
+                ← Anterior
+              </Button>
+
+              <div className={styles.answerActions}>
+                {!currentAnswer ? (
+                  <>
+                    <Button
+                      disabled={isSubmitting || isFinishing || clock.expired}
+                      loading={isSkipping}
+                      loadingLabel="Pulando questão"
+                      onClick={skipCurrentQuestion}
+                      variant="ghost"
+                    >
+                      Pular questão
+                    </Button>
+                    <Button
+                      disabled={
+                        !selectedAnswer ||
+                        isSkipping ||
+                        isFinishing ||
+                        clock.expired
+                      }
+                      loading={isSubmitting}
+                      loadingLabel="Salvando resposta"
+                      onClick={submitAnswer}
+                    >
+                      Confirmar resposta
+                    </Button>
+                  </>
+                ) : (
+                  <span className={styles.savedLabel}>Resposta salva</span>
+                )}
+              </div>
+
+              <Button
+                disabled={isSubmitting || isSkipping || isFinishing}
+                onClick={goToNext}
+                variant="secondary"
+              >
+                Próxima <span aria-hidden="true">→</span>
+              </Button>
+            </footer>
           </div>
-        </div>
-        {canShowSummary ? (
-          <Button onClick={() => setView("summary")} size="small" variant="ghost">
-            Ver resumo
-          </Button>
-        ) : null}
-      </header>
 
-      <div className={styles.progressBlock}>
-        <div className={styles.progressCopy}>
-          <span>
-            Questão {currentIndex + 1} de {sessionQuestions.length}
-          </span>
-          <span>{answeredCount} de {progressTotal} respondidas</span>
-        </div>
-        <div
-          aria-label={`${answeredCount} de ${progressTotal} questões respondidas`}
-          aria-valuemax={progressTotal}
-          aria-valuemin={0}
-          aria-valuenow={answeredCount}
-          className={styles.progressTrack}
-          role="progressbar"
-        >
-          <span style={{ width: `${Math.min(100, progressPercentage)}%` }} />
-        </div>
-      </div>
+          <aside className={styles.navigator} aria-label="Navegação do simulado">
+            <div className={styles.navigatorTop}>
+              <div>
+                <p className={styles.eyebrow}>Mapa da prova</p>
+                <h2>Navegação</h2>
+              </div>
+              <button
+                aria-expanded={navigatorOpen}
+                className={styles.navigatorToggle}
+                onClick={() => setNavigatorOpen((current) => !current)}
+                type="button"
+              >
+                {navigatorOpen ? "Ocultar questões" : "Ver questões"}
+              </button>
+            </div>
 
-      <article className={styles.questionCard}>
-        <div className={styles.questionNumber} aria-hidden="true">
-          {String(currentQuestion.position).padStart(2, "0")}.
-        </div>
-        <div className={styles.questionBody}>
-          <h1 className={styles.stem} id={`${idPrefix}-question-title`}>
-            {currentQuestion.stem}
-          </h1>
-
-          <fieldset
-            aria-describedby={currentAnswer ? feedbackId : undefined}
-            className={styles.options}
-            disabled={Boolean(currentAnswer) || isSubmitting}
-          >
-            <legend className={styles.srOnly}>Escolha uma alternativa</legend>
-            {currentQuestion.options.map((option) => {
-              const selected = selectedAnswer === option.label;
-              const isConfirmedCorrect = Boolean(
-                currentAnswer &&
-                  !currentAnswer.annulled &&
-                  (currentAnswer.correctAnswer === option.label ||
-                    (currentAnswer.isCorrect === true && selected)),
-              );
-              const isConfirmedWrong = Boolean(
-                currentAnswer &&
-                  !currentAnswer.annulled &&
-                  selected &&
-                  currentAnswer.isCorrect === false,
-              );
-              const optionClasses = [
-                styles.option,
-                selected && styles.optionSelected,
-                isConfirmedCorrect && styles.optionCorrect,
-                isConfirmedWrong && styles.optionWrong,
-                currentAnswer?.annulled && selected && styles.optionAnnulled,
+            <div
+              className={[
+                styles.navigatorBody,
+                navigatorOpen && styles.navigatorBodyOpen,
               ]
                 .filter(Boolean)
-                .join(" ");
-
-              return (
-                <label className={optionClasses} key={option.label}>
-                  <input
-                    checked={selected}
-                    className={styles.radio}
-                    name={radioName}
-                    onChange={() => selectAnswer(option.label)}
-                    type="radio"
-                    value={option.label}
-                  />
-                  <span aria-hidden="true" className={styles.optionLetter}>
-                    {option.label}
-                  </span>
-                  <span>{option.text}</span>
-                </label>
-              );
-            })}
-          </fieldset>
-
-          {currentAnswer ? (
-            <div
-              aria-live="polite"
-              className={[
-                styles.feedback,
-                currentAnswer.annulled
-                  ? styles.feedbackAnnulled
-                  : currentAnswer.isCorrect === true
-                    ? styles.feedbackCorrect
-                    : currentAnswer.isCorrect === false
-                      ? styles.feedbackWrong
-                      : styles.feedbackNeutral,
-              ].join(" ")}
-              id={feedbackId}
-              role="status"
+                .join(" ")}
             >
-              <strong>
-                {currentAnswer.annulled
-                  ? "Questão anulada"
-                  : currentAnswer.isCorrect === true
-                    ? "Resposta correta"
-                    : currentAnswer.isCorrect === false
-                      ? "Resposta incorreta"
-                      : "Resposta registrada"}
-              </strong>
-              <span>
-                {currentAnswer.annulled
-                  ? "Ela foi contabilizada conforme as regras do simulado."
-                  : currentAnswer.isCorrect === false && currentAnswer.correctAnswer
-                    ? `O gabarito confirmado é a alternativa ${currentAnswer.correctAnswer}.`
-                    : "Sua resposta foi salva nesta tentativa."}
-              </span>
+              <nav
+                aria-label="Ir diretamente para uma questão"
+                className={styles.questionGrid}
+              >
+                {sessionQuestions.map((question, index) => {
+                  const answered = Boolean(answers[question.itemId]);
+                  const skipped =
+                    skippedItems.has(question.itemId) && !answered;
+                  const current = index === currentIndex;
+                  const questionClasses = [
+                    styles.questionLink,
+                    answered
+                      ? styles.questionAnswered
+                      : skipped
+                        ? styles.questionSkipped
+                        : styles.questionUnanswered,
+                    current && styles.questionCurrent,
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+
+                  return (
+                    <button
+                      aria-current={current ? "step" : undefined}
+                      aria-label={navigationLabel({
+                        number: question.position,
+                        answered,
+                        skipped,
+                        current,
+                      })}
+                      className={questionClasses}
+                      disabled={isSubmitting || isSkipping || isFinishing}
+                      key={question.itemId}
+                      onClick={() => goToQuestion(index)}
+                      type="button"
+                    >
+                      {question.position}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div className={styles.legend} aria-label="Legenda">
+                <strong>Legenda</strong>
+                <span>
+                  <i className={styles.legendAnswered} /> Respondida
+                </span>
+                <span>
+                  <i className={styles.legendSkipped} /> Pulada
+                </span>
+                <span>
+                  <i className={styles.legendUnanswered} /> Sem resposta
+                </span>
+              </div>
             </div>
-          ) : null}
 
-          {answerError ? <p className={styles.error} role="alert">{answerError}</p> : null}
+            <div
+              className={[
+                styles.clock,
+                clockCritical && styles.clockCritical,
+                clock.expired && styles.clockExpired,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <span>
+                {clock.mode === "countdown"
+                  ? "Tempo restante"
+                  : "Tempo decorrido"}
+              </span>
+              <strong aria-live="off" role="timer">
+                {formatSimulationTime(clock.seconds)}
+              </strong>
+              <small>
+                {clock.mode === "countdown"
+                  ? "A tentativa encerra automaticamente no zero."
+                  : "Este simulado não possui limite configurado."}
+              </small>
+            </div>
+
+            {finishError ? (
+              <p className={styles.sidebarError} role="alert">
+                {finishError}
+              </p>
+            ) : null}
+
+            <Button
+              className={styles.finishButton}
+              disabled={
+                finished ||
+                isSubmitting ||
+                isSkipping ||
+                (clock.expired && !finishError)
+              }
+              fullWidth
+              loading={isFinishing}
+              loadingLabel={
+                finishTrigger === "timeout"
+                  ? "Tempo esgotado, finalizando"
+                  : "Finalizando simulado"
+              }
+              onClick={() => {
+                openFinishDialog();
+              }}
+              variant="danger"
+            >
+              {finished ? "Finalizado" : "Finalizar agora"}
+            </Button>
+
+            <p className={styles.finishHint}>
+              Questões sem resposta não são contabilizadas como erros.
+            </p>
+          </aside>
         </div>
-      </article>
+      </section>
 
-      <footer className={styles.runnerFooter}>
-        <Button
-          disabled={currentIndex === 0 || isSubmitting}
-          onClick={() => goToQuestion(currentIndex - 1)}
-          variant="ghost"
+      {showFinishConfirm ? (
+        <div
+          className={styles.dialogBackdrop}
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target && !isFinishing) {
+              setShowFinishConfirm(false);
+            }
+          }}
         >
-          ← Anterior
-        </Button>
-        {!currentAnswer ? (
-          <Button
-            disabled={!selectedAnswer}
-            loading={isSubmitting}
-            loadingLabel="Salvando resposta"
-            onClick={submitAnswer}
+          <div
+            aria-describedby={`${idPrefix}-finish-description`}
+            aria-labelledby={`${idPrefix}-finish-title`}
+            aria-modal="true"
+            className={styles.finishDialog}
+            onKeyDown={handleFinishDialogKeyDown}
+            ref={finishDialogRef}
+            role="dialog"
+            tabIndex={-1}
           >
-            Confirmar resposta
-          </Button>
-        ) : (
-          <span className={styles.savedLabel}>Resposta salva</span>
-        )}
-        <Button disabled={nextDisabled} onClick={goToNext} variant="secondary">
-          {nextLabel} <span aria-hidden="true">→</span>
-        </Button>
-      </footer>
-    </section>
+            <p className={styles.eyebrow}>Encerrar tentativa</p>
+            <h2 id={`${idPrefix}-finish-title`}>Finalizar agora?</h2>
+            <p id={`${idPrefix}-finish-description`}>
+              Depois de finalizar, as respostas não poderão ser alteradas e o
+              resultado com acertos e erros será calculado.
+            </p>
+
+            <dl className={styles.finishSummary}>
+              <div>
+                <dt>Respondidas</dt>
+                <dd>{answeredCount}</dd>
+              </div>
+              <div>
+                <dt>Serão puladas</dt>
+                <dd>{pendingAtFinish}</dd>
+              </div>
+            </dl>
+
+            <div className={styles.finishRule}>
+              As {pendingAtFinish} questões sem resposta ficarão fora da
+              contagem de acertos e erros.
+            </div>
+
+            <div className={styles.dialogActions}>
+              <Button
+                disabled={isFinishing}
+                onClick={() => setShowFinishConfirm(false)}
+                variant="secondary"
+              >
+                Continuar respondendo
+              </Button>
+              <Button
+                loading={isFinishing}
+                loadingLabel="Finalizando simulado"
+                onClick={() => {
+                  void finishSimulation("manual");
+                }}
+                variant="danger"
+              >
+                Finalizar e ver resultado
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

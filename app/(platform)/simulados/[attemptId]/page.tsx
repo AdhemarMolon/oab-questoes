@@ -3,10 +3,18 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { SimulationRunner } from "@/components/study";
-import { getAttemptForRunner } from "@/lib/data/simulations";
+import {
+  finalizeSimulationAttemptForUser,
+  getAttemptForRunner,
+} from "@/lib/data/simulations";
 import { requireUser } from "@/lib/session";
+import { getSimulationClock } from "@/lib/simulation-attempt";
 
-import { answerSimulationQuestion, finishSimulationAttempt } from "../actions";
+import {
+  answerSimulationQuestion,
+  finishSimulationAttempt,
+  skipSimulationQuestion,
+} from "../actions";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Resolver simulado" };
@@ -17,6 +25,19 @@ export default async function AttemptPage({ params }: { params: Promise<{ attemp
 
   if (!data) notFound();
   if (data.attempt.status === "SUBMITTED") redirect(`/simulados/${attemptId}/resultado`);
+  const initialClock = getSimulationClock({
+    startedAt: data.attempt.startedAt,
+    expiresAt: data.attempt.expiresAt,
+  });
+  if (initialClock.expired) {
+    const finalization = await finalizeSimulationAttemptForUser({
+      userId: session.user.id,
+      attemptId,
+    });
+    if (finalization.ok) {
+      redirect(`/simulados/${attemptId}/resultado`);
+    }
+  }
 
   return (
     <main className={styles.page} id="main-content">
@@ -28,7 +49,10 @@ export default async function AttemptPage({ params }: { params: Promise<{ attemp
         answerAction={answerSimulationQuestion}
         attemptId={attemptId}
         finishAction={finishSimulationAttempt}
+        hasTimeLimit={Boolean(data.attempt.expiresAt)}
+        initialTimeSeconds={initialClock.seconds}
         questions={data.questions}
+        skipAction={skipSimulationQuestion}
       />
     </main>
   );

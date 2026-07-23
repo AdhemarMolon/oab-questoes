@@ -8,6 +8,13 @@
       "when": 1784763950136,
       "tag": "0000_motionless_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784830410256,
+      "tag": "0001_simulation_navigation",
+      "breakpoints": true
     }
   ]
 }

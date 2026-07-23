@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { getAttemptResult } from "@/lib/data/simulations";
 import { requireUser } from "@/lib/session";
@@ -17,6 +17,7 @@ export default async function AttemptResultPage({
   const [{ attemptId }, session] = await Promise.all([params, requireUser()]);
   const result = await getAttemptResult(session.user.id, attemptId);
   if (!result) notFound();
+  if (result.status !== "SUBMITTED") redirect(`/simulados/${attemptId}`);
 
   return (
     <main className={styles.page} id="main-content">
@@ -30,11 +31,13 @@ export default async function AttemptResultPage({
         <div className={styles.metrics}>
           <div><strong>{result.answered}</strong><span>respondidas</span></div>
           <div><strong>{result.correct}</strong><span>corretas</span></div>
-          <div><strong>{Math.max(0, result.answered - result.correct)}</strong><span>incorretas</span></div>
+          <div><strong>{result.incorrect}</strong><span>incorretas</span></div>
+          <div><strong>{result.annulled}</strong><span>anuladas</span></div>
+          <div><strong>{result.skipped}</strong><span>puladas</span></div>
         </div>
-        {result.status !== "SUBMITTED" && (
-          <div className={styles.warning}>Esta tentativa ainda não foi finalizada.</div>
-        )}
+        <p className={styles.scoreNote}>
+          Questões puladas e anuladas ficam fora do cálculo de aproveitamento.
+        </p>
         <div className={styles.actions}>
           <Link href="/simulados">Ver simulados</Link>
           <Link href="/painel">Ir para meu painel →</Link>

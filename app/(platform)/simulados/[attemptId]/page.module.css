@@ -1,5 +1,5 @@
 .page {
-  width: min(1180px, 100%);
+  width: min(1320px, 100%);
   margin: 0 auto;
   padding: 28px clamp(14px, 4vw, 54px) 70px;
 }

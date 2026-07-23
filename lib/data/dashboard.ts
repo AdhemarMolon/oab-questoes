@@ -1,4 +1,4 @@
-import { count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import {
@@ -14,6 +14,7 @@ export type DashboardSummary = {
   attempts: number;
   completedAttempts: number;
   answeredQuestions: number;
+  scoredQuestions: number;
   correctAnswers: number;
   accuracy: number;
 };
@@ -32,7 +33,23 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
     database
       .select({
         answered: count(simulationAnswers.attemptQuestionId),
-        correct: sql<number>`count(*) filter (where ${simulationAnswers.isCorrect} = true)`,
+        correct: sql<number>`
+          count(*) filter (
+            where ${simulationAnswers.isCorrect} = true
+              and coalesce(
+                ((${simulationAttemptQuestions.snapshot} ->> 'annulled')::boolean),
+                false
+              ) = false
+          )
+        `,
+        annulled: sql<number>`
+          count(*) filter (
+            where coalesce(
+              ((${simulationAttemptQuestions.snapshot} ->> 'annulled')::boolean),
+              false
+            ) = true
+          )
+        `,
       })
       .from(simulationAnswers)
       .innerJoin(
@@ -43,7 +60,12 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
         simulationAttempts,
         eq(simulationAttempts.id, simulationAttemptQuestions.attemptId),
       )
-      .where(eq(simulationAttempts.userId, userId)),
+      .where(
+        and(
+          eq(simulationAttempts.userId, userId),
+          eq(simulationAttempts.status, "SUBMITTED"),
+        ),
+      ),
     database
       .select({
         id: simulationAttempts.id,
@@ -64,7 +86,23 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
           .select({
             subject: subjects.name,
             answered: count(simulationAnswers.attemptQuestionId),
-            correct: sql<number>`count(*) filter (where ${simulationAnswers.isCorrect} = true)`,
+            correct: sql<number>`
+              count(*) filter (
+                where ${simulationAnswers.isCorrect} = true
+                  and coalesce(
+                    ((${simulationAttemptQuestions.snapshot} ->> 'annulled')::boolean),
+                    false
+                  ) = false
+              )
+            `,
+            annulled: sql<number>`
+              count(*) filter (
+                where coalesce(
+                  ((${simulationAttemptQuestions.snapshot} ->> 'annulled')::boolean),
+                  false
+                ) = true
+              )
+            `,
           })
           .from(simulationAnswers)
           .innerJoin(
@@ -77,7 +115,12 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
           )
           .innerJoin(questions, eq(questions.id, simulationAttemptQuestions.questionId))
           .innerJoin(subjects, eq(subjects.id, questions.subjectId))
-          .where(eq(simulationAttempts.userId, userId))
+          .where(
+            and(
+              eq(simulationAttempts.userId, userId),
+              eq(simulationAttempts.status, "SUBMITTED"),
+            ),
+          )
           .groupBy(subjects.id, subjects.name)
           .orderBy(desc(count(simulationAnswers.attemptQuestionId)))
       : Promise.resolve([]),
@@ -86,14 +129,20 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
   const attempts = Number(attemptTotals[0]?.attempts ?? 0);
   const completedAttempts = Number(attemptTotals[0]?.completed ?? 0);
   const answeredQuestions = Number(answerTotals[0]?.answered ?? 0);
+  const annulledQuestions = Number(answerTotals[0]?.annulled ?? 0);
+  const scoredQuestions = Math.max(0, answeredQuestions - annulledQuestions);
   const correctAnswers = Number(answerTotals[0]?.correct ?? 0);
 
   const summary: DashboardSummary = {
     attempts,
     completedAttempts,
     answeredQuestions,
+    scoredQuestions,
     correctAnswers,
-    accuracy: answeredQuestions > 0 ? Math.round((correctAnswers / answeredQuestions) * 100) : 0,
+    accuracy:
+      scoredQuestions > 0
+        ? Math.round((correctAnswers / scoredQuestions) * 100)
+        : 0,
   };
 
   return {
@@ -101,12 +150,15 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
     recentAttempts,
     subjectPerformance: subjectPerformance.map((row) => {
       const answered = Number(row.answered);
+      const annulled = Number(row.annulled);
+      const scored = Math.max(0, answered - annulled);
       const correct = Number(row.correct);
       return {
         subject: row.subject,
         answered,
+        scored,
         correct,
-        accuracy: answered > 0 ? Math.round((correct / answered) * 100) : 0,
+        accuracy: scored > 0 ? Math.round((correct / scored) * 100) : 0,
       };
     }),
   };

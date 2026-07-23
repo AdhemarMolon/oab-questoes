@@ -571,6 +571,7 @@ export const simulationAttempts = pgTable(
     totalQuestions: integer("total_questions").notNull(),
     correctAnswers: integer("correct_answers"),
     startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     abandonedAt: timestamp("abandoned_at", { withTimezone: true }),
     clientRequestId: text("client_request_id"),
@@ -612,6 +613,7 @@ export const simulationAttemptQuestions = pgTable(
     position: integer("position").notNull(),
     snapshot: jsonb("snapshot").$type<AttemptQuestionSnapshot>().notNull(),
     correctAnswerSnapshot: varchar("correct_answer_snapshot", { length: 1 }),
+    skippedAt: timestamp("skipped_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

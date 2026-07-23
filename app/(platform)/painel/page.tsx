@@ -44,7 +44,7 @@ export default async function DashboardPage() {
         <article className={styles.primaryMetric}>
           <span>APROVEITAMENTO</span>
           <strong>{dashboard.summary.accuracy}%</strong>
-          <p>{dashboard.summary.correctAnswers} acertos em {dashboard.summary.answeredQuestions} respostas</p>
+          <p>{dashboard.summary.correctAnswers} acertos em {dashboard.summary.scoredQuestions} questões corrigidas</p>
           <i><b style={{ width: `${dashboard.summary.accuracy}%` }} /></i>
         </article>
         <article>
@@ -120,7 +120,7 @@ export default async function DashboardPage() {
               {dashboard.subjectPerformance.map((subject) => (
                 <article key={subject.subject}>
                   <strong>{subject.subject}</strong>
-                  <span>{subject.answered} respondidas · {subject.correct} acertos</span>
+                  <span>{subject.scored} questões corrigidas · {subject.correct} acertos</span>
                   <i><b style={{ width: `${subject.accuracy}%` }} /></i>
                   <em>{subject.accuracy}%</em>
                 </article>

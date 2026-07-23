@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { SimulationQuestion as RunnerQuestion } from "@/components/study";
 import { getDb } from "@/db";
@@ -14,6 +14,7 @@ import {
   type AttemptQuestionSnapshot,
 } from "@/db/schema";
 import { canAccessSimulation, type ResolvedAccess } from "@/lib/access";
+import { calculateSimulationScore } from "@/lib/simulation-attempt";
 
 const OPTION_LABELS = ["A", "B", "C", "D"] as const;
 
@@ -149,6 +150,10 @@ export async function createSimulationAttempt(input: {
   }
 
   const attemptId = crypto.randomUUID();
+  const startedAt = new Date();
+  const expiresAt = simulation.durationMinutes
+    ? new Date(startedAt.getTime() + simulation.durationMinutes * 60_000)
+    : null;
   const attemptQuestionRows = sourceQuestions.map((question) => {
     const snapshot: AttemptQuestionSnapshot = {
       externalId: question.externalId,
@@ -180,6 +185,8 @@ export async function createSimulationAttempt(input: {
         freeAccessClaim: consumesFreeAccess,
         totalQuestions: attemptQuestionRows.length,
         clientRequestId: input.clientRequestId,
+        startedAt,
+        expiresAt,
       }),
       database.insert(simulationAttemptQuestions).values(attemptQuestionRows),
     ]);
@@ -214,6 +221,7 @@ export async function getAttemptForRunner(userId: string, attemptId: string) {
       totalQuestions: simulationAttempts.totalQuestions,
       correctAnswers: simulationAttempts.correctAnswers,
       startedAt: simulationAttempts.startedAt,
+      expiresAt: simulationAttempts.expiresAt,
       submittedAt: simulationAttempts.submittedAt,
       title: simulations.title,
     })
@@ -233,6 +241,7 @@ export async function getAttemptForRunner(userId: string, attemptId: string) {
       position: simulationAttemptQuestions.position,
       snapshot: simulationAttemptQuestions.snapshot,
       correctAnswer: simulationAttemptQuestions.correctAnswerSnapshot,
+      skippedAt: simulationAttemptQuestions.skippedAt,
       selectedAnswer: simulationAnswers.selectedAnswer,
       isCorrect: simulationAnswers.isCorrect,
       subject: subjects.name,
@@ -256,12 +265,16 @@ export async function getAttemptForRunner(userId: string, attemptId: string) {
     examLabel: row.examTitle,
     stem: row.snapshot.statement,
     options: optionsForRunner(row.snapshot.options),
+    skipped: Boolean(row.skippedAt && !row.selectedAnswer),
     existingAnswer: row.selectedAnswer
       ? {
           selectedAnswer: row.selectedAnswer as "A" | "B" | "C" | "D",
-          correctAnswer: row.correctAnswer as "A" | "B" | "C" | "D" | null,
-          isCorrect: row.isCorrect,
-          annulled: row.snapshot.annulled,
+          correctAnswer:
+            attempt.status === "SUBMITTED"
+              ? (row.correctAnswer as "A" | "B" | "C" | "D" | null)
+              : null,
+          isCorrect: attempt.status === "SUBMITTED" ? row.isCorrect : null,
+          annulled: attempt.status === "SUBMITTED" && row.snapshot.annulled,
         }
       : undefined,
   }));
@@ -273,13 +286,20 @@ export async function getAttemptResult(userId: string, attemptId: string) {
   const data = await getAttemptForRunner(userId, attemptId);
   if (!data) return null;
 
-  const answered = data.questions.filter((question) => question.existingAnswer);
-  const correct = answered.filter((question) => question.existingAnswer?.isCorrect).length;
+  const answered = data.questions.flatMap((question) =>
+    question.existingAnswer
+      ? [
+          {
+            isCorrect: question.existingAnswer.isCorrect,
+            annulled: question.existingAnswer.annulled,
+          },
+        ]
+      : [],
+  );
+  const score = calculateSimulationScore(data.attempt.totalQuestions, answered);
   return {
     ...data.attempt,
-    answered: answered.length,
-    correct,
-    accuracy: answered.length ? Math.round((correct / answered.length) * 100) : 0,
+    ...score,
   };
 }
 
@@ -295,6 +315,7 @@ export async function findAttemptItem(input: {
       correctAnswer: simulationAttemptQuestions.correctAnswerSnapshot,
       status: simulationAttempts.status,
       totalQuestions: simulationAttempts.totalQuestions,
+      expiresAt: simulationAttempts.expiresAt,
     })
     .from(simulationAttemptQuestions)
     .innerJoin(
@@ -310,6 +331,67 @@ export async function findAttemptItem(input: {
     )
     .limit(1);
   return rows[0] ?? null;
+}
+
+export async function finalizeSimulationAttemptForUser(input: {
+  userId: string;
+  attemptId: string;
+}) {
+  const database = getDb();
+  const [lockedAttempts, submittedAttempts] = await database.batch([
+    database
+      .select({
+        id: simulationAttempts.id,
+        status: simulationAttempts.status,
+      })
+      .from(simulationAttempts)
+      .where(
+        and(
+          eq(simulationAttempts.id, input.attemptId),
+          eq(simulationAttempts.userId, input.userId),
+        ),
+      )
+      .for("update"),
+    database
+      .update(simulationAttempts)
+      .set({
+        status: "SUBMITTED",
+        correctAnswers: sql<number>`(
+          select count(*)::integer
+          from ${simulationAnswers}
+          inner join ${simulationAttemptQuestions}
+            on ${simulationAttemptQuestions.id} = ${simulationAnswers.attemptQuestionId}
+          where ${simulationAttemptQuestions.attemptId} = ${input.attemptId}
+            and ${simulationAnswers.isCorrect} = true
+            and coalesce(
+              ((${simulationAttemptQuestions.snapshot} ->> 'annulled')::boolean),
+              false
+            ) = false
+        )`,
+        submittedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(simulationAttempts.id, input.attemptId),
+          eq(simulationAttempts.userId, input.userId),
+          eq(simulationAttempts.status, "IN_PROGRESS"),
+        ),
+      )
+      .returning({ id: simulationAttempts.id }),
+  ]);
+  const lockedAttempt = lockedAttempts[0];
+
+  if (!lockedAttempt) {
+    return { ok: false as const, reason: "NOT_FOUND" as const };
+  }
+  if (lockedAttempt.status === "SUBMITTED") {
+    return { ok: true as const, attemptId: lockedAttempt.id };
+  }
+  if (lockedAttempt.status !== "IN_PROGRESS" || !submittedAttempts[0]) {
+    return { ok: false as const, reason: "INVALID_STATUS" as const };
+  }
+
+  return { ok: true as const, attemptId: lockedAttempt.id };
 }
 
 export async function getAttemptsByIds(userId: string, ids: string[]) {

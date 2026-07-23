@@ -50,7 +50,7 @@
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   margin-top: 38px;
   border-block: 1px solid var(--border);
 }
@@ -69,6 +69,13 @@
   display: block;
 }
 
+.scoreNote {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 14px auto 0;
+}
+
 .metrics strong {
   font: 600 29px var(--font-serif);
 }
@@ -77,14 +84,6 @@
   margin-top: 4px;
   color: var(--text-muted);
   font-size: 10px;
-}
-
-.warning {
-  margin-top: 22px;
-  padding: 12px;
-  color: #704c16;
-  background: #f5ead2;
-  font-size: 12px;
 }
 
 .actions {
@@ -109,9 +108,20 @@
 }
 
 @media (max-width: 520px) {
-  .metrics,
+  .metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .metrics div {
+    border: 1px solid var(--border);
+    margin: -1px 0 0 -1px;
+  }
+
+  .metrics div:last-child {
+    grid-column: 1 / -1;
+  }
+
   .actions {
-    grid-template-columns: 1fr;
     flex-direction: column;
   }
 
