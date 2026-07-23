@@ -60,12 +60,6 @@
   font-weight: 800;
 }
 
-.headerCta {
-  padding: 12px 17px;
-  color: white !important;
-  background: var(--brand);
-}
-
 .hero {
   position: relative;
   display: grid;
@@ -518,8 +512,7 @@
     padding-inline: 18px;
   }
 
-  .header nav,
-  .accountLinks > a:first-child {
+  .header nav {
     display: none;
   }
 
@@ -553,10 +546,6 @@
 
   .brand span {
     font-size: 20px;
-  }
-
-  .headerCta {
-    padding: 10px 12px;
   }
 
   .hero {

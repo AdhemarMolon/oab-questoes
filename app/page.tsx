@@ -23,7 +23,6 @@ export default function HomePage() {
 
         <div className={styles.accountLinks}>
           <Link href="/entrar">Entrar</Link>
-          <Link className={styles.headerCta} href="/entrar">Começar</Link>
         </div>
       </header>
 
