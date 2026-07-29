@@ -9,12 +9,8 @@ import {
 } from "@/lib/billing/config";
 import { AuthAccessError, requireUser } from "@/lib/session";
 
-export type CheckoutActionState = {
+type CheckoutActionState = {
   error: string | null;
-};
-
-export const initialCheckoutActionState: CheckoutActionState = {
-  error: null,
 };
 
 export async function startCheckoutAction(

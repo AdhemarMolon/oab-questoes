@@ -4,11 +4,14 @@ import { useActionState } from "react";
 
 import type { BillingPlanCode } from "@/lib/billing/config";
 
-import {
-  initialCheckoutActionState,
-  startCheckoutAction,
-} from "./actions";
+import { startCheckoutAction } from "./actions";
 import styles from "./page.module.css";
+
+const initialCheckoutActionState: Awaited<
+  ReturnType<typeof startCheckoutAction>
+> = {
+  error: null,
+};
 
 export function CheckoutButton({
   configured,
