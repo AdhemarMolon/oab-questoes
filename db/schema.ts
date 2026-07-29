@@ -572,6 +572,8 @@ export const simulationAttempts = pgTable(
     correctAnswers: integer("correct_answers"),
     startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    pausedClockSeconds: integer("paused_clock_seconds"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     abandonedAt: timestamp("abandoned_at", { withTimezone: true }),
     clientRequestId: text("client_request_id"),
@@ -591,6 +593,14 @@ export const simulationAttempts = pgTable(
       table.status,
     ),
     check("simulation_attempts_total_positive", sql`${table.totalQuestions} > 0`),
+    check(
+      "simulation_attempts_paused_clock_nonnegative",
+      sql`${table.pausedClockSeconds} is null or ${table.pausedClockSeconds} >= 0`,
+    ),
+    check(
+      "simulation_attempts_pause_consistent",
+      sql`(${table.pausedAt} is null) = (${table.pausedClockSeconds} is null)`,
+    ),
     check(
       "simulation_attempts_score_valid",
       sql`${table.correctAnswers} is null or (${table.correctAnswers} >= 0 and ${table.correctAnswers} <= ${table.totalQuestions})`,

@@ -22,3 +22,4 @@ export {
 } from "./AppHeader";
 export { PlatformHeader } from "./PlatformHeader";
 export { AdminPlatformShell } from "./AdminPlatformShell";
+export { SiteFooter } from "./SiteFooter";

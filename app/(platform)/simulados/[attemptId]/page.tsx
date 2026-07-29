@@ -13,6 +13,8 @@ import { getSimulationClock } from "@/lib/simulation-attempt";
 import {
   answerSimulationQuestion,
   finishSimulationAttempt,
+  pauseSimulationAttempt,
+  resumeSimulationAttemptAction,
   skipSimulationQuestion,
 } from "../actions";
 import styles from "./page.module.css";
@@ -25,6 +27,28 @@ export default async function AttemptPage({ params }: { params: Promise<{ attemp
 
   if (!data) notFound();
   if (data.attempt.status === "SUBMITTED") redirect(`/simulados/${attemptId}/resultado`);
+  if (data.attempt.pausedAt) {
+    return (
+      <main className={styles.page} id="main-content">
+        <div className={styles.topline}>
+          <Link href="/simulados">← Voltar aos simulados</Link>
+          <span>{data.attempt.title}</span>
+        </div>
+        <section className={styles.paused}>
+          <p>SIMULADO PAUSADO</p>
+          <h1>Seu tempo está congelado.</h1>
+          <span>
+            As respostas confirmadas estão salvas. Retome quando estiver pronto
+            para continuar do mesmo ponto.
+          </span>
+          <form action={resumeSimulationAttemptAction}>
+            <input name="attemptId" type="hidden" value={attemptId} />
+            <button type="submit">Retomar simulado →</button>
+          </form>
+        </section>
+      </main>
+    );
+  }
   const initialClock = getSimulationClock({
     startedAt: data.attempt.startedAt,
     expiresAt: data.attempt.expiresAt,
@@ -51,6 +75,7 @@ export default async function AttemptPage({ params }: { params: Promise<{ attemp
         finishAction={finishSimulationAttempt}
         hasTimeLimit={Boolean(data.attempt.expiresAt)}
         initialTimeSeconds={initialClock.seconds}
+        pauseAction={pauseSimulationAttempt}
         questions={data.questions}
         skipAction={skipSimulationQuestion}
       />

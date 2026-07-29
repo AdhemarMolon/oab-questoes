@@ -154,7 +154,172 @@
   line-height: 1.55;
 }
 
+.errorMessage {
+  margin: 26px 0 -18px;
+  padding: 13px 16px;
+  color: #812936;
+  border: 1px solid #d9aab0;
+  background: #f6e6e7;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.privacyPanel {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.8fr) minmax(250px, 1fr) auto;
+  gap: 30px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 25px 27px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.privacyPanel > div > span,
+.dangerIntro > span {
+  color: var(--brand);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.privacyPanel h2,
+.dangerIntro h2 {
+  margin: 7px 0 0;
+  font: 600 24px / 1.1 var(--font-serif);
+}
+
+.privacyPanel > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.privacyPanel nav {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.privacyPanel a {
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.dangerZone {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.75fr) minmax(300px, 1.25fr);
+  gap: 35px;
+  margin-top: 16px;
+  padding: 27px;
+  border: 1px solid #d6afb4;
+  border-left: 5px solid var(--danger);
+  background: #fffafa;
+}
+
+.dangerIntro > span {
+  color: var(--danger);
+}
+
+.dangerIntro p,
+.deletionDetails p {
+  margin: 11px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.dangerZone details {
+  align-self: start;
+  border: 1px solid #d6afb4;
+  background: white;
+}
+
+.dangerZone summary {
+  padding: 14px 16px;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.deletionDetails {
+  padding: 18px;
+  border-top: 1px solid #ead3d6;
+}
+
+.deletionDetails > strong {
+  color: #78232e;
+  font: 600 17px var(--font-serif);
+}
+
+.deletionDetails form {
+  display: grid;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.acknowledgement {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.acknowledgement input {
+  margin-top: 2px;
+}
+
+.confirmationField {
+  display: grid;
+  gap: 7px;
+}
+
+.confirmationField > span {
+  color: #674f52;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.confirmationField input {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #c99ba1;
+  background: #fffafa;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.deletionDetails button {
+  min-height: 43px;
+  padding: 0 16px;
+  color: white;
+  border: 0;
+  background: var(--danger);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.deletionDetails button:hover {
+  background: #7f2530;
+}
+
 @media(max-width:700px) {
   .columns,
-  .note { grid-template-columns: 1fr; }
+  .note,
+  .privacyPanel,
+  .dangerZone { grid-template-columns: 1fr; }
+
+  .privacyPanel nav {
+    justify-items: start;
+  }
 }

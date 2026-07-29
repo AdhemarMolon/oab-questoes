@@ -38,6 +38,8 @@ export type AdminUserFilters = {
   access?: UserAccessFilter;
 };
 
+const qualifiedUserId = sql.raw('"user"."id"');
+
 function activeGrantSql() {
   return sql`ag.revoked_at is null and ag.starts_at <= now() and (ag.ends_at is null or ag.ends_at > now())`;
 }
@@ -45,7 +47,7 @@ function activeGrantSql() {
 function accessCondition(filter: UserAccessFilter) {
   const fullGrant = sql`exists (
     select 1 from access_grants ag
-    where ag.user_id = ${user.id}
+    where ag.user_id = ${qualifiedUserId}
       and ${activeGrantSql()}
       and ag.plan <> 'FREE'
   )`;
@@ -55,7 +57,7 @@ function accessCondition(filter: UserAccessFilter) {
   if (filter === "paying") {
     return sql`exists (
       select 1 from access_grants ag
-      where ag.user_id = ${user.id}
+      where ag.user_id = ${qualifiedUserId}
         and ${activeGrantSql()}
         and ag.source in ('SUBSCRIPTION', 'PURCHASE')
         and ag.plan <> 'FREE'
@@ -64,7 +66,7 @@ function accessCondition(filter: UserAccessFilter) {
   if (filter === "gift") {
     return sql`exists (
       select 1 from access_grants ag
-      where ag.user_id = ${user.id}
+      where ag.user_id = ${qualifiedUserId}
         and ${activeGrantSql()}
         and ag.source in ('GIFT', 'ADMIN')
         and ag.plan <> 'FREE'
@@ -83,7 +85,7 @@ export async function getAdminMetrics() {
         admins: sql<number>`count(*) filter (where ${user.role} = 'admin')`,
         paying: sql<number>`count(*) filter (where exists (
           select 1 from access_grants ag
-          where ag.user_id = ${user.id}
+          where ag.user_id = ${qualifiedUserId}
             and ag.revoked_at is null
             and ag.starts_at <= now()
             and (ag.ends_at is null or ag.ends_at > now())
@@ -92,7 +94,7 @@ export async function getAdminMetrics() {
         ))`,
         fullAccess: sql<number>`count(*) filter (where exists (
           select 1 from access_grants ag
-          where ag.user_id = ${user.id}
+          where ag.user_id = ${qualifiedUserId}
             and ag.revoked_at is null
             and ag.starts_at <= now()
             and (ag.ends_at is null or ag.ends_at > now())

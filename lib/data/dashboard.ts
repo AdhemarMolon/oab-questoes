@@ -1,4 +1,4 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import {
@@ -21,12 +21,36 @@ export type DashboardSummary = {
 
 export async function getDashboardData(userId: string, includeAdvanced = false) {
   const database = getDb();
+  const latestAttemptPerSimulation = database
+    .selectDistinctOn([simulationAttempts.simulationId], {
+      id: simulationAttempts.id,
+      simulationId: simulationAttempts.simulationId,
+      title: simulations.title,
+      status: simulationAttempts.status,
+      totalQuestions: simulationAttempts.totalQuestions,
+      correctAnswers: simulationAttempts.correctAnswers,
+      startedAt: simulationAttempts.startedAt,
+      submittedAt: simulationAttempts.submittedAt,
+      pausedAt: simulationAttempts.pausedAt,
+    })
+    .from(simulationAttempts)
+    .innerJoin(simulations, eq(simulations.id, simulationAttempts.simulationId))
+    .where(eq(simulationAttempts.userId, userId))
+    .orderBy(
+      simulationAttempts.simulationId,
+      desc(simulationAttempts.startedAt),
+      desc(simulationAttempts.id),
+    )
+    .as("latest_attempt_per_simulation");
 
   const [attemptTotals, answerTotals, recentAttempts, subjectPerformance] = await Promise.all([
     database
       .select({
         attempts: count(),
-        completed: sql<number>`count(*) filter (where ${simulationAttempts.status} = 'SUBMITTED')`,
+        completed: sql<number>`
+          count(distinct ${simulationAttempts.simulationId})
+          filter (where ${simulationAttempts.status} = 'SUBMITTED')
+        `,
       })
       .from(simulationAttempts)
       .where(eq(simulationAttempts.userId, userId)),
@@ -60,26 +84,20 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
         simulationAttempts,
         eq(simulationAttempts.id, simulationAttemptQuestions.attemptId),
       )
-      .where(
-        and(
-          eq(simulationAttempts.userId, userId),
-          eq(simulationAttempts.status, "SUBMITTED"),
-        ),
-      ),
+      .where(eq(simulationAttempts.userId, userId)),
     database
       .select({
-        id: simulationAttempts.id,
-        title: simulations.title,
-        status: simulationAttempts.status,
-        totalQuestions: simulationAttempts.totalQuestions,
-        correctAnswers: simulationAttempts.correctAnswers,
-        startedAt: simulationAttempts.startedAt,
-        submittedAt: simulationAttempts.submittedAt,
+        id: latestAttemptPerSimulation.id,
+        title: latestAttemptPerSimulation.title,
+        status: latestAttemptPerSimulation.status,
+        totalQuestions: latestAttemptPerSimulation.totalQuestions,
+        correctAnswers: latestAttemptPerSimulation.correctAnswers,
+        startedAt: latestAttemptPerSimulation.startedAt,
+        submittedAt: latestAttemptPerSimulation.submittedAt,
+        pausedAt: latestAttemptPerSimulation.pausedAt,
       })
-      .from(simulationAttempts)
-      .innerJoin(simulations, eq(simulations.id, simulationAttempts.simulationId))
-      .where(eq(simulationAttempts.userId, userId))
-      .orderBy(desc(simulationAttempts.startedAt))
+      .from(latestAttemptPerSimulation)
+      .orderBy(desc(latestAttemptPerSimulation.startedAt))
       .limit(5),
     includeAdvanced
       ? database
@@ -115,12 +133,7 @@ export async function getDashboardData(userId: string, includeAdvanced = false) 
           )
           .innerJoin(questions, eq(questions.id, simulationAttemptQuestions.questionId))
           .innerJoin(subjects, eq(subjects.id, questions.subjectId))
-          .where(
-            and(
-              eq(simulationAttempts.userId, userId),
-              eq(simulationAttempts.status, "SUBMITTED"),
-            ),
-          )
+          .where(eq(simulationAttempts.userId, userId))
           .groupBy(subjects.id, subjects.name)
           .orderBy(desc(count(simulationAnswers.attemptQuestionId)))
       : Promise.resolve([]),

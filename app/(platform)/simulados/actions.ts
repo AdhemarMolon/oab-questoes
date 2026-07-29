@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, exists, notExists, sql } from "drizzle-orm";
+import { and, count, eq, exists, isNull, notExists, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import type {
   SimulationAnswerInput,
   SimulationAnswerResult,
   SimulationFinishResult,
+  SimulationPauseResult,
   SimulationSkipInput,
   SimulationSkipResult,
 } from "@/components/study";
@@ -23,12 +24,15 @@ import {
   createSimulationAttempt,
   finalizeSimulationAttemptForUser,
   findAttemptItem,
+  pauseSimulationAttemptForUser,
+  resumeSimulationAttemptForUser,
 } from "@/lib/data/simulations";
 import { requireUser } from "@/lib/session";
 
 const startSchema = z.object({
   simulationId: z.string().uuid(),
   clientRequestId: z.string().uuid(),
+  replacePreviousResult: z.boolean(),
 });
 
 const answerSchema = z.object({
@@ -52,6 +56,7 @@ function publicStartError(error: unknown) {
       "Simulado não encontrado.",
       "Este simulado exige acesso completo.",
       "Este simulado ainda não possui questões publicadas.",
+      "Confirme que deseja sobrepor o último resultado deste simulado.",
     ];
     if (expected.includes(error.message)) return error.message;
   }
@@ -62,6 +67,8 @@ export async function startSimulationAction(formData: FormData) {
   const parsed = startSchema.safeParse({
     simulationId: formData.get("simulationId"),
     clientRequestId: formData.get("clientRequestId"),
+    replacePreviousResult:
+      formData.get("replacePreviousResult") === "true",
   });
 
   if (!parsed.success) {
@@ -77,6 +84,7 @@ export async function startSimulationAction(formData: FormData) {
       userId: session.user.id,
       simulationId: parsed.data.simulationId,
       clientRequestId: parsed.data.clientRequestId,
+      replacePreviousResult: parsed.data.replacePreviousResult,
       access,
     });
   } catch (error) {
@@ -87,6 +95,40 @@ export async function startSimulationAction(formData: FormData) {
   revalidatePath("/simulados");
   revalidatePath("/painel");
   redirect(`/simulados/${attemptId}`);
+}
+
+export async function resumeSimulationAttemptAction(formData: FormData) {
+  const parsed = z.string().uuid().safeParse(formData.get("attemptId"));
+  if (!parsed.success) {
+    redirect("/simulados?erro=simulado-invalido");
+  }
+
+  const session = await requireUser();
+  let result: Awaited<ReturnType<typeof resumeSimulationAttemptForUser>>;
+  try {
+    result = await resumeSimulationAttemptForUser({
+      userId: session.user.id,
+      attemptId: parsed.data,
+    });
+  } catch (error) {
+    console.error("Failed to resume simulation attempt.", error);
+    const message = encodeURIComponent(
+      "Não foi possível retomar o simulado agora.",
+    );
+    redirect(`/simulados?erro=${message}`);
+  }
+
+  if (!result.ok) {
+    const message = encodeURIComponent(
+      "Não foi possível retomar o simulado agora.",
+    );
+    redirect(`/simulados?erro=${message}`);
+  }
+
+  revalidatePath("/painel");
+  revalidatePath("/simulados");
+  revalidatePath(`/simulados/${parsed.data}`);
+  redirect(`/simulados/${parsed.data}`);
 }
 
 export async function answerSimulationQuestion(
@@ -106,6 +148,9 @@ export async function answerSimulationQuestion(
     if (!item) return { ok: false, error: "Questão não encontrada nesta tentativa." };
     if (item.status !== "IN_PROGRESS") {
       return { ok: false, error: "Esta tentativa já foi encerrada." };
+    }
+    if (item.pausedAt) {
+      return { ok: false, error: "Esta tentativa está pausada." };
     }
     if (attemptExpired(item.expiresAt)) {
       return {
@@ -139,6 +184,8 @@ export async function answerSimulationQuestion(
           "selected_answer",
         ),
         isCorrect: sql<boolean>`${isCorrect}`.as("is_correct"),
+        answeredAt: sql<Date>`current_timestamp`.as("answered_at"),
+        updatedAt: sql<Date>`current_timestamp`.as("updated_at"),
       })
       .from(simulationAttemptQuestions)
       .innerJoin(
@@ -151,6 +198,7 @@ export async function answerSimulationQuestion(
           eq(simulationAttemptQuestions.attemptId, parsed.data.attemptId),
           eq(simulationAttempts.userId, session.user.id),
           eq(simulationAttempts.status, "IN_PROGRESS"),
+          isNull(simulationAttempts.pausedAt),
           sql`(
             ${simulationAttempts.expiresAt} is null
             or ${simulationAttempts.expiresAt} > current_timestamp
@@ -210,7 +258,8 @@ export async function answerSimulationQuestion(
       total: item.totalQuestions,
       completed: answeredCount >= item.totalQuestions,
     };
-  } catch {
+  } catch (error) {
+    console.error("Failed to save simulation answer.", error);
     return { ok: false, error: "Não foi possível salvar sua resposta. Tente novamente." };
   }
 }
@@ -233,6 +282,9 @@ export async function skipSimulationQuestion(
     if (item.status !== "IN_PROGRESS") {
       return { ok: false, error: "Esta tentativa já foi encerrada." };
     }
+    if (item.pausedAt) {
+      return { ok: false, error: "Esta tentativa está pausada." };
+    }
     if (attemptExpired(item.expiresAt)) {
       return {
         ok: false,
@@ -254,6 +306,7 @@ export async function skipSimulationQuestion(
           eq(simulationAttempts.id, parsed.data.attemptId),
           eq(simulationAttempts.userId, session.user.id),
           eq(simulationAttempts.status, "IN_PROGRESS"),
+          isNull(simulationAttempts.pausedAt),
           sql`(
             ${simulationAttempts.expiresAt} is null
             or ${simulationAttempts.expiresAt} > current_timestamp
@@ -302,6 +355,41 @@ export async function skipSimulationQuestion(
     return { ok: true };
   } catch {
     return { ok: false, error: "Não foi possível pular esta questão. Tente novamente." };
+  }
+}
+
+export async function pauseSimulationAttempt(
+  attemptId: string,
+): Promise<SimulationPauseResult> {
+  const parsed = z.string().uuid().safeParse(attemptId);
+  if (!parsed.success) {
+    return { ok: false, error: "Tentativa inválida." };
+  }
+
+  try {
+    const session = await requireUser();
+    const result = await pauseSimulationAttemptForUser({
+      userId: session.user.id,
+      attemptId: parsed.data,
+    });
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: "Esta tentativa não pode ser pausada agora.",
+      };
+    }
+
+    revalidatePath("/painel");
+    revalidatePath("/simulados");
+    revalidatePath(`/simulados/${parsed.data}`);
+    return { ok: true, redirectTo: "/simulados" };
+  } catch (error) {
+    console.error("Failed to pause simulation attempt.", error);
+    return {
+      ok: false,
+      error: "Não foi possível pausar o simulado agora.",
+    };
   }
 }
 

@@ -1,0 +1,142 @@
+.repeat {
+  display: contents;
+}
+
+button.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  color: white;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(31, 25, 21, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.dialog {
+  width: min(510px, 100%);
+  padding: clamp(27px, 5vw, 39px);
+  border: 1px solid #cdbda7;
+  border-top: 4px solid var(--brand);
+  background: var(--surface);
+  box-shadow: 0 28px 75px rgba(28, 20, 16, 0.28);
+}
+
+.dialog:focus {
+  outline: none;
+}
+
+.eyebrow {
+  color: var(--brand);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.dialog h2 {
+  margin: 10px 0 12px;
+  font: 600 clamp(27px, 5vw, 36px) / 1.05 var(--font-serif);
+  letter-spacing: -0.035em;
+}
+
+.dialog > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.dialog > p strong {
+  color: var(--text);
+}
+
+.info {
+  display: grid;
+  grid-template-columns: 21px 1fr;
+  gap: 10px;
+  align-items: start;
+  margin-top: 22px;
+  padding: 15px;
+  border: 1px solid rgba(38, 114, 74, 0.24);
+  background: rgba(38, 114, 74, 0.06);
+}
+
+.info > span {
+  display: grid;
+  place-content: center;
+  width: 19px;
+  height: 19px;
+  color: var(--success);
+  border: 1px solid rgba(38, 114, 74, 0.4);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.info p {
+  margin: 1px 0 0;
+  color: #365c47;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 11px;
+  margin-top: 25px;
+}
+
+.actions form {
+  margin: 0;
+}
+
+button.cancelAction,
+button.confirmAction {
+  min-height: 43px;
+  padding: 0 17px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+button.cancelAction {
+  color: var(--brand);
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+button.confirmAction {
+  color: white;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+}
+
+button.confirmAction:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+@media (max-width: 480px) {
+  .actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .actions form,
+  button.cancelAction,
+  button.confirmAction {
+    width: 100%;
+  }
+}

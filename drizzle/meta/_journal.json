@@ -15,6 +15,13 @@
       "when": 1784830410256,
       "tag": "0001_simulation_navigation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785276144014,
+      "tag": "0002_plain_shadowcat",
+      "breakpoints": true
     }
   ]
 }

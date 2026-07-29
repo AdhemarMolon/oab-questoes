@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-import { AnnouncementBanner, PlatformHeader } from "@/components/shell";
+import {
+  AnnouncementBanner,
+  PlatformHeader,
+  SiteFooter,
+} from "@/components/shell";
 import { getUserAccess } from "@/lib/data/access";
 import { getVisibleAnnouncement } from "@/lib/data/announcements";
 import { AuthConfigurationError } from "@/lib/auth";
@@ -35,19 +39,22 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
   if (context.setupRequired) {
     return (
-      <main className={styles.setupPage}>
-        <section>
-          <p>CONFIGURAÇÃO DO MVP</p>
-          <h1>A plataforma está pronta para receber as credenciais.</h1>
-          <span>
-            Configure o Neon e o Google OAuth no arquivo de ambiente para liberar as rotas autenticadas.
-          </span>
-          {process.env.NODE_ENV !== "production" && (
-            <code>{context.issues.map((issue) => issue.variable).join(" · ")}</code>
-          )}
-          <Link href="/">Voltar ao início</Link>
-        </section>
-      </main>
+      <>
+        <main className={styles.setupPage}>
+          <section>
+            <p>CONFIGURAÇÃO DO MVP</p>
+            <h1>A plataforma está pronta para receber as credenciais.</h1>
+            <span>
+              Configure o Neon e o Google OAuth no arquivo de ambiente para liberar as rotas autenticadas.
+            </span>
+            {process.env.NODE_ENV !== "production" && (
+              <code>{context.issues.map((issue) => issue.variable).join(" · ")}</code>
+            )}
+            <Link href="/">Voltar ao início</Link>
+          </section>
+        </main>
+        <SiteFooter />
+      </>
     );
   }
 
@@ -70,6 +77,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         </div>
       )}
       {children}
+      <SiteFooter />
     </div>
   );
 }

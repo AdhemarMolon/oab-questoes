@@ -49,6 +49,7 @@ export async function listAvailableSimulations(userId: string, access: ResolvedA
         correctAnswers: simulationAttempts.correctAnswers,
         startedAt: simulationAttempts.startedAt,
         submittedAt: simulationAttempts.submittedAt,
+        pausedAt: simulationAttempts.pausedAt,
         freeAccessClaim: simulationAttempts.freeAccessClaim,
       })
       .from(simulationAttempts)
@@ -62,6 +63,12 @@ export async function listAvailableSimulations(userId: string, access: ResolvedA
       latestBySimulation.set(attempt.simulationId, attempt);
     }
   }
+  const claimedFreeAttempt =
+    attempts.find((attempt) => attempt.freeAccessClaim) ?? null;
+  const currentFreeAttempt = claimedFreeAttempt
+    ? latestBySimulation.get(claimedFreeAttempt.simulationId) ??
+      claimedFreeAttempt
+    : null;
 
   return {
     simulations: catalog.map((simulation) => ({
@@ -69,7 +76,7 @@ export async function listAvailableSimulations(userId: string, access: ResolvedA
       available: canAccessSimulation(access, simulation.access),
       latestAttempt: latestBySimulation.get(simulation.id) ?? null,
     })),
-    freeAttempt: attempts.find((attempt) => attempt.freeAccessClaim) ?? null,
+    freeAttempt: currentFreeAttempt,
   };
 }
 
@@ -83,6 +90,7 @@ export async function createSimulationAttempt(input: {
   userId: string;
   simulationId: string;
   clientRequestId: string;
+  replacePreviousResult?: boolean;
   access: ResolvedAccess;
 }) {
   const database = getDb();
@@ -104,10 +112,43 @@ export async function createSimulationAttempt(input: {
     throw new Error("Este simulado exige acesso completo.");
   }
 
-  const consumesFreeAccess = !input.access.hasFullAccess;
-  if (consumesFreeAccess) {
+  const latestAttemptRows = await database
+    .select({
+      id: simulationAttempts.id,
+      status: simulationAttempts.status,
+    })
+    .from(simulationAttempts)
+    .where(
+      and(
+        eq(simulationAttempts.userId, input.userId),
+        eq(simulationAttempts.simulationId, simulation.id),
+      ),
+    )
+    .orderBy(desc(simulationAttempts.startedAt), desc(simulationAttempts.id))
+    .limit(1);
+  const latestAttempt = latestAttemptRows[0];
+
+  if (latestAttempt?.status === "IN_PROGRESS") {
+    return latestAttempt.id;
+  }
+  if (
+    latestAttempt?.status === "SUBMITTED" &&
+    !input.replacePreviousResult
+  ) {
+    throw new Error(
+      "Confirme que deseja sobrepor o último resultado deste simulado.",
+    );
+  }
+
+  let existingFreeAttempt:
+    | { id: string; simulationId: string }
+    | undefined;
+  if (!input.access.hasFullAccess) {
     const existingFree = await database
-      .select({ id: simulationAttempts.id })
+      .select({
+        id: simulationAttempts.id,
+        simulationId: simulationAttempts.simulationId,
+      })
       .from(simulationAttempts)
       .where(
         and(
@@ -117,8 +158,16 @@ export async function createSimulationAttempt(input: {
       )
       .orderBy(desc(simulationAttempts.startedAt))
       .limit(1);
-    if (existingFree[0]) return existingFree[0].id;
+    existingFreeAttempt = existingFree[0];
+    if (
+      existingFreeAttempt &&
+      existingFreeAttempt.simulationId !== simulation.id
+    ) {
+      throw new Error("Este simulado exige acesso completo.");
+    }
   }
+  const consumesFreeAccess =
+    !input.access.hasFullAccess && !existingFreeAttempt;
 
   const sourceQuestions = await database
     .select({
@@ -223,6 +272,8 @@ export async function getAttemptForRunner(userId: string, attemptId: string) {
       startedAt: simulationAttempts.startedAt,
       expiresAt: simulationAttempts.expiresAt,
       submittedAt: simulationAttempts.submittedAt,
+      pausedAt: simulationAttempts.pausedAt,
+      pausedClockSeconds: simulationAttempts.pausedClockSeconds,
       title: simulations.title,
     })
     .from(simulationAttempts)
@@ -316,6 +367,7 @@ export async function findAttemptItem(input: {
       status: simulationAttempts.status,
       totalQuestions: simulationAttempts.totalQuestions,
       expiresAt: simulationAttempts.expiresAt,
+      pausedAt: simulationAttempts.pausedAt,
     })
     .from(simulationAttemptQuestions)
     .innerJoin(
@@ -375,6 +427,7 @@ export async function finalizeSimulationAttemptForUser(input: {
           eq(simulationAttempts.id, input.attemptId),
           eq(simulationAttempts.userId, input.userId),
           eq(simulationAttempts.status, "IN_PROGRESS"),
+          isNull(simulationAttempts.pausedAt),
         ),
       )
       .returning({ id: simulationAttempts.id }),
@@ -392,6 +445,112 @@ export async function finalizeSimulationAttemptForUser(input: {
   }
 
   return { ok: true as const, attemptId: lockedAttempt.id };
+}
+
+export async function pauseSimulationAttemptForUser(input: {
+  userId: string;
+  attemptId: string;
+}) {
+  const pausedAttempts = await getDb()
+    .update(simulationAttempts)
+    .set({
+      pausedAt: sql<Date>`current_timestamp`,
+      pausedClockSeconds: sql<number>`
+        case
+          when ${simulationAttempts.expiresAt} is not null then
+            greatest(
+              0,
+              ceil(
+                extract(
+                  epoch from (
+                    ${simulationAttempts.expiresAt} - current_timestamp
+                  )
+                )
+              )::integer
+            )
+          else
+            greatest(
+              0,
+              floor(
+                extract(
+                  epoch from (
+                    current_timestamp - ${simulationAttempts.startedAt}
+                  )
+                )
+              )::integer
+            )
+        end
+      `,
+    })
+    .where(
+      and(
+        eq(simulationAttempts.id, input.attemptId),
+        eq(simulationAttempts.userId, input.userId),
+        eq(simulationAttempts.status, "IN_PROGRESS"),
+        isNull(simulationAttempts.pausedAt),
+        sql`(
+          ${simulationAttempts.expiresAt} is null
+          or ${simulationAttempts.expiresAt} > current_timestamp
+        )`,
+      ),
+    )
+    .returning({
+      id: simulationAttempts.id,
+      pausedClockSeconds: simulationAttempts.pausedClockSeconds,
+    });
+
+  const paused = pausedAttempts[0];
+  return paused
+    ? {
+        ok: true as const,
+        attemptId: paused.id,
+        clockSeconds: paused.pausedClockSeconds ?? 0,
+      }
+    : { ok: false as const, reason: "NOT_PAUSABLE" as const };
+}
+
+export async function resumeSimulationAttemptForUser(input: {
+  userId: string;
+  attemptId: string;
+}) {
+  const resumedAttempts = await getDb()
+    .update(simulationAttempts)
+    .set({
+      startedAt: sql<Date>`
+        case
+          when ${simulationAttempts.expiresAt} is null then
+            current_timestamp - make_interval(
+              secs => ${simulationAttempts.pausedClockSeconds}
+            )
+          else ${simulationAttempts.startedAt}
+        end
+      `,
+      expiresAt: sql<Date | null>`
+        case
+          when ${simulationAttempts.expiresAt} is not null then
+            current_timestamp + make_interval(
+              secs => ${simulationAttempts.pausedClockSeconds}
+            )
+          else null
+        end
+      `,
+      pausedAt: null,
+      pausedClockSeconds: null,
+    })
+    .where(
+      and(
+        eq(simulationAttempts.id, input.attemptId),
+        eq(simulationAttempts.userId, input.userId),
+        eq(simulationAttempts.status, "IN_PROGRESS"),
+        sql`${simulationAttempts.pausedAt} is not null`,
+        sql`${simulationAttempts.pausedClockSeconds} is not null`,
+      ),
+    )
+    .returning({ id: simulationAttempts.id });
+
+  return resumedAttempts[0]
+    ? { ok: true as const, attemptId: resumedAttempts[0].id }
+    : { ok: false as const, reason: "NOT_PAUSED" as const };
 }
 
 export async function getAttemptsByIds(userId: string, ids: string[]) {

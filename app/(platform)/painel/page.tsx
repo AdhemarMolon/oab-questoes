@@ -78,7 +78,11 @@ export default async function DashboardPage() {
                     <span>{dateFormatter.format(attempt.startedAt)}</span>
                   </div>
                   <Badge variant={attempt.status === "SUBMITTED" ? "success" : "warning"}>
-                    {attempt.status === "SUBMITTED" ? "Concluído" : "Em andamento"}
+                    {attempt.status === "SUBMITTED"
+                      ? "Concluído"
+                      : attempt.pausedAt
+                        ? "Em pausa"
+                        : "Em andamento"}
                   </Badge>
                   <b aria-hidden="true">→</b>
                 </Link>
@@ -100,7 +104,7 @@ export default async function DashboardPage() {
             {access.hasFullAccess
               ? "Crie novas tentativas e use as estatísticas detalhadas sem limite."
               : catalog.freeAttempt
-                ? "Sua tentativa continua disponível para revisão. O plano completo libera novos simulados."
+                ? "Seu simulado gratuito pode ser revisto ou refeito. O plano completo libera outros simulados."
                 : "Faça um simulado completo e acompanhe as estatísticas básicas sem pagar."}
           </p>
           <Link href={access.hasFullAccess ? "/simulados" : "/planos"}>

@@ -71,11 +71,18 @@
   line-height: 1.55;
 }
 
-.allowance a {
+.allowance a,
+.resumeForm button {
   color: var(--brand);
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.resumeForm button {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .grid {
@@ -143,8 +150,8 @@
   padding-top: 30px;
 }
 
-.cardActions a,
-.cardActions button {
+.cardActions > a,
+.cardActions > form button {
   padding: 11px 13px;
   color: var(--brand);
   border: 1px solid var(--brand);
@@ -153,7 +160,7 @@
   font-weight: 800;
 }
 
-.cardActions form:last-child button,
+.cardActions > form:last-child button,
 .cardActions .upgrade {
   color: white;
   background: var(--brand);

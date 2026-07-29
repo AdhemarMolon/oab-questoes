@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { SiteFooter } from "@/components/shell";
 import { getAuthConfiguration } from "@/lib/auth";
 import { getCurrentSession } from "@/lib/session";
 
@@ -38,8 +39,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main className={styles.page} id="main-content">
-      <section className={styles.story} aria-label="Área do candidato">
+    <>
+      <main className={styles.page} id="main-content">
+        <section className={styles.story} aria-label="Área do candidato">
         <Link className={styles.brand} href="/" aria-label="Minha OAB — início">
           <strong>Minha</strong> OAB
         </Link>
@@ -78,9 +80,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             PROGRESSO SALVO
           </span>
         </footer>
-      </section>
+        </section>
 
-      <section className={styles.signInPanel}>
+        <section className={styles.signInPanel}>
         <div className={styles.panelContent}>
           <div className={styles.card}>
             <div className={styles.cardMeta}>
@@ -154,7 +156,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <span aria-hidden="true">←</span> Voltar ao início
           </Link>
         </div>
-      </section>
-    </main>
+        </section>
+      </main>
+      <SiteFooter />
+    </>
   );
 }

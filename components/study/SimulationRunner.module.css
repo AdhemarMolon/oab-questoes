@@ -346,6 +346,12 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.navigatorBody {
+  border-top: 1px solid #d8cbb7;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
 .questionLink {
   align-items: center;
   border: 1px solid;
@@ -462,6 +468,10 @@
   padding: 0.85rem 0.9rem;
 }
 
+.clockTop {
+  margin-top: 0;
+}
+
 .clock > span {
   color: #d9cbb7;
   font-size: 0.62rem;
@@ -503,7 +513,14 @@
 }
 
 .finishButton {
-  margin-top: 0.85rem;
+  margin-top: 0;
+}
+
+.attemptActions {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 0.7rem;
 }
 
 .finishHint {
@@ -557,7 +574,7 @@
 
 .finishSummary {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   margin: 1.35rem 0 0;
 }
 
@@ -597,6 +614,18 @@
   line-height: 1.45;
   margin-top: 1rem;
   padding: 0.8rem 0.9rem;
+}
+
+.pendingAction {
+  margin-top: 1rem;
+}
+
+.dialogError {
+  background: #f4e2e3;
+  border-left: 3px solid #963b43;
+  color: #7e262d !important;
+  font-weight: 700;
+  padding: 0.7rem 0.8rem;
 }
 
 .dialogActions {

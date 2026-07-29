@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SiteFooter } from "@/components/shell";
 import { SiteHeader } from "@/components/shell/SiteHeader";
 
 import styles from "./page.module.css";
@@ -138,6 +139,7 @@ export default function HowItWorksPage() {
           </footer>
         </section>
       </section>
+      <SiteFooter />
     </main>
   );
 }

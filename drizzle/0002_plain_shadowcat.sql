@@ -1,0 +1,4 @@
+ALTER TABLE "simulation_attempts" ADD COLUMN "paused_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "simulation_attempts" ADD COLUMN "paused_clock_seconds" integer;--> statement-breakpoint
+ALTER TABLE "simulation_attempts" ADD CONSTRAINT "simulation_attempts_paused_clock_nonnegative" CHECK ("simulation_attempts"."paused_clock_seconds" is null or "simulation_attempts"."paused_clock_seconds" >= 0);--> statement-breakpoint
+ALTER TABLE "simulation_attempts" ADD CONSTRAINT "simulation_attempts_pause_consistent" CHECK (("simulation_attempts"."paused_at" is null) = ("simulation_attempts"."paused_clock_seconds" is null));

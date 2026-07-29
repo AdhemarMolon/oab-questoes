@@ -6,6 +6,7 @@ export {
   type SimulationFinishResult,
   type SimulationOption,
   type SimulationOptionLabel,
+  type SimulationPauseResult,
   type SimulationQuestion,
   type SimulationRunnerProps,
   type SimulationSkipInput,

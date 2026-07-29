@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SiteFooter } from "@/components/shell";
 import { SiteHeader } from "@/components/shell/SiteHeader";
 
 import styles from "./page.module.css";
@@ -93,6 +94,7 @@ export default function HomePage() {
           </section>
         </div>
       </section>
+      <SiteFooter />
     </main>
   );
 }

@@ -70,6 +70,12 @@ export interface SimulationFinishResult {
   redirectTo?: string;
 }
 
+export interface SimulationPauseResult {
+  ok: boolean;
+  error?: string;
+  redirectTo?: string;
+}
+
 export interface SimulationRunnerProps {
   attemptId: string;
   questions: readonly SimulationQuestion[];
@@ -80,6 +86,7 @@ export interface SimulationRunnerProps {
   ) => Promise<SimulationAnswerResult>;
   skipAction: (input: SimulationSkipInput) => Promise<SimulationSkipResult>;
   finishAction: (attemptId: string) => Promise<SimulationFinishResult>;
+  pauseAction: (attemptId: string) => Promise<SimulationPauseResult>;
 }
 
 type StoredAnswer = SimulationExistingAnswer;
@@ -218,6 +225,7 @@ export function SimulationRunner({
   finishAction,
   hasTimeLimit,
   initialTimeSeconds,
+  pauseAction,
   questions,
   skipAction,
 }: SimulationRunnerProps) {
@@ -226,8 +234,11 @@ export function SimulationRunner({
   const submissionLock = useRef(false);
   const skipLock = useRef(false);
   const finishLock = useRef(false);
+  const pauseLock = useRef(false);
   const finishDialogRef = useRef<HTMLDivElement>(null);
   const finishDialogTriggerRef = useRef<HTMLElement | null>(null);
+  const pauseDialogRef = useRef<HTMLDivElement>(null);
+  const pauseDialogTriggerRef = useRef<HTMLElement | null>(null);
   const [sessionQuestions] = useState(() => cloneQuestions(questions));
   const [answers, setAnswers] = useState<Record<string, StoredAnswer>>(() =>
     getInitialAnswers(sessionQuestions),
@@ -251,13 +262,17 @@ export function SimulationRunner({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isConfirmingPending, setIsConfirmingPending] = useState(false);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
   const [finishTrigger, setFinishTrigger] = useState<FinishTrigger | null>(
     null,
   );
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showPauseConfirm, setShowPauseConfirm] = useState(false);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
 
   const clock = useAttemptClock({
@@ -278,6 +293,17 @@ export function SimulationRunner({
       finishDialogTriggerRef.current = null;
     }
   }, [isFinishing, showFinishConfirm]);
+
+  useEffect(() => {
+    if (showPauseConfirm) {
+      pauseDialogRef.current?.focus();
+      return;
+    }
+    if (!isPausing && pauseDialogTriggerRef.current) {
+      pauseDialogTriggerRef.current.focus();
+      pauseDialogTriggerRef.current = null;
+    }
+  }, [isPausing, showPauseConfirm]);
 
   if (!sessionQuestions.length) {
     return (
@@ -305,6 +331,10 @@ export function SimulationRunner({
     0,
     sessionQuestions.length - answeredCount,
   );
+  const pendingSelectionCount = sessionQuestions.filter(
+    (question) =>
+      Boolean(selections[question.itemId]) && !answers[question.itemId],
+  ).length;
   const progressPercentage = sessionQuestions.length
     ? Math.round((answeredCount / sessionQuestions.length) * 100)
     : 0;
@@ -316,6 +346,7 @@ export function SimulationRunner({
   function clearMessages() {
     setAnswerError(null);
     setFinishError(null);
+    setDialogError(null);
   }
 
   function openFinishDialog() {
@@ -324,13 +355,23 @@ export function SimulationRunner({
         ? document.activeElement
         : null;
     setFinishError(null);
+    setDialogError(null);
     setShowFinishConfirm(true);
+  }
+
+  function openPauseDialog() {
+    pauseDialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setDialogError(null);
+    setShowPauseConfirm(true);
   }
 
   function handleFinishDialogKeyDown(
     event: React.KeyboardEvent<HTMLDivElement>,
   ) {
-    if (event.key === "Escape" && !isFinishing) {
+    if (event.key === "Escape" && !isFinishing && !isConfirmingPending) {
       setShowFinishConfirm(false);
       return;
     }
@@ -356,6 +397,14 @@ export function SimulationRunner({
     } else if (!event.shiftKey && document.activeElement === last) {
       event.preventDefault();
       first.focus();
+    }
+  }
+
+  function handlePauseDialogKeyDown(
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) {
+    if (event.key === "Escape" && !isPausing && !isConfirmingPending) {
+      setShowPauseConfirm(false);
     }
   }
 
@@ -511,6 +560,118 @@ export function SimulationRunner({
     }
   }
 
+  async function confirmPendingAnswers() {
+    if (
+      submissionLock.current ||
+      skipLock.current ||
+      finishLock.current ||
+      pauseLock.current ||
+      isConfirmingPending
+    ) {
+      return;
+    }
+
+    const pending = sessionQuestions.flatMap((question) => {
+      const selection = selections[question.itemId];
+      return selection && !answers[question.itemId]
+        ? [{ question, selection }]
+        : [];
+    });
+    if (!pending.length) return;
+
+    submissionLock.current = true;
+    setIsConfirmingPending(true);
+    setDialogError(null);
+
+    const confirmedAnswers: Record<string, StoredAnswer> = {};
+    const confirmedIds: string[] = [];
+
+    try {
+      for (const { question, selection } of pending) {
+        const result = await answerAction({
+          attemptId,
+          itemId: question.itemId,
+          selectedAnswer: selection,
+        });
+
+        if (!result.ok) {
+          setDialogError(
+            safeErrorMessage(
+              result.error,
+              "Não foi possível confirmar todas as questões pendentes.",
+            ),
+          );
+          return;
+        }
+
+        confirmedAnswers[question.itemId] = {
+          selectedAnswer: isOptionLabel(result.selectedAnswer)
+            ? result.selectedAnswer
+            : selection,
+          correctAnswer: null,
+          isCorrect: null,
+          annulled: false,
+        };
+        confirmedIds.push(question.itemId);
+      }
+
+      setAnswers((current) => ({ ...current, ...confirmedAnswers }));
+      setSkippedItems((current) => {
+        const next = new Set(current);
+        for (const itemId of confirmedIds) next.delete(itemId);
+        return next;
+      });
+    } catch {
+      setDialogError(
+        "Não foi possível confirmar todas as questões pendentes. Verifique sua conexão e tente novamente.",
+      );
+    } finally {
+      submissionLock.current = false;
+      setIsConfirmingPending(false);
+    }
+  }
+
+  async function pauseSimulation() {
+    if (
+      pauseLock.current ||
+      isPausing ||
+      submissionLock.current ||
+      skipLock.current ||
+      finishLock.current
+    ) {
+      return;
+    }
+
+    pauseLock.current = true;
+    setIsPausing(true);
+    setDialogError(null);
+
+    try {
+      const result = await pauseAction(attemptId);
+      if (!result.ok) {
+        setDialogError(
+          safeErrorMessage(
+            result.error,
+            "Não foi possível pausar o simulado. Tente novamente.",
+          ),
+        );
+        return;
+      }
+
+      setShowPauseConfirm(false);
+      if (isSafeInternalPath(result.redirectTo)) {
+        router.push(result.redirectTo!);
+      }
+    } catch {
+      setDialogError(
+        "Não foi possível pausar o simulado. Verifique sua conexão e tente novamente.",
+      );
+    } finally {
+      pauseLock.current = false;
+      setIsPausing(false);
+    }
+  }
+
   async function finishSimulation(trigger: FinishTrigger) {
     if (finished || finishLock.current || isFinishing) return;
 
@@ -560,7 +721,7 @@ export function SimulationRunner({
       <section
         aria-labelledby={`${idPrefix}-question-title`}
         className={styles.runner}
-        inert={showFinishConfirm ? true : undefined}
+        inert={showFinishConfirm || showPauseConfirm ? true : undefined}
       >
         <div className={styles.runnerLayout}>
           <div className={styles.mainColumn}>
@@ -751,6 +912,80 @@ export function SimulationRunner({
 
             <div
               className={[
+                styles.clock,
+                styles.clockTop,
+                clockCritical && styles.clockCritical,
+                clock.expired && styles.clockExpired,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <span>
+                {clock.mode === "countdown"
+                  ? "Tempo restante"
+                  : "Tempo decorrido"}
+              </span>
+              <strong aria-live="off" role="timer">
+                {formatSimulationTime(clock.seconds)}
+              </strong>
+              <small>
+                {clock.mode === "countdown"
+                  ? "A tentativa encerra automaticamente no zero."
+                  : "Este simulado não possui limite configurado."}
+              </small>
+            </div>
+
+            <div className={styles.attemptActions}>
+              <Button
+                disabled={
+                  finished ||
+                  isSubmitting ||
+                  isSkipping ||
+                  isFinishing ||
+                  isPausing ||
+                  clock.expired
+                }
+                fullWidth
+                onClick={openPauseDialog}
+                variant="secondary"
+              >
+                Fazer pausa
+              </Button>
+              <Button
+                className={styles.finishButton}
+                disabled={
+                  finished ||
+                  isSubmitting ||
+                  isSkipping ||
+                  isPausing ||
+                  (clock.expired && !finishError)
+                }
+                fullWidth
+                loading={isFinishing}
+                loadingLabel={
+                  finishTrigger === "timeout"
+                    ? "Tempo esgotado, finalizando"
+                    : "Finalizando simulado"
+                }
+                onClick={openFinishDialog}
+                variant="danger"
+              >
+                {finished ? "Finalizado" : "Finalizar agora"}
+              </Button>
+            </div>
+
+            <p className={styles.finishHint}>
+              Questões sem resposta não são contabilizadas como erros.
+            </p>
+
+            {finishError ? (
+              <p className={styles.sidebarError} role="alert">
+                {finishError}
+              </p>
+            ) : null}
+
+            <div
+              className={[
                 styles.navigatorBody,
                 navigatorOpen && styles.navigatorBodyOpen,
               ]
@@ -813,62 +1048,6 @@ export function SimulationRunner({
               </div>
             </div>
 
-            <div
-              className={[
-                styles.clock,
-                clockCritical && styles.clockCritical,
-                clock.expired && styles.clockExpired,
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span>
-                {clock.mode === "countdown"
-                  ? "Tempo restante"
-                  : "Tempo decorrido"}
-              </span>
-              <strong aria-live="off" role="timer">
-                {formatSimulationTime(clock.seconds)}
-              </strong>
-              <small>
-                {clock.mode === "countdown"
-                  ? "A tentativa encerra automaticamente no zero."
-                  : "Este simulado não possui limite configurado."}
-              </small>
-            </div>
-
-            {finishError ? (
-              <p className={styles.sidebarError} role="alert">
-                {finishError}
-              </p>
-            ) : null}
-
-            <Button
-              className={styles.finishButton}
-              disabled={
-                finished ||
-                isSubmitting ||
-                isSkipping ||
-                (clock.expired && !finishError)
-              }
-              fullWidth
-              loading={isFinishing}
-              loadingLabel={
-                finishTrigger === "timeout"
-                  ? "Tempo esgotado, finalizando"
-                  : "Finalizando simulado"
-              }
-              onClick={() => {
-                openFinishDialog();
-              }}
-              variant="danger"
-            >
-              {finished ? "Finalizado" : "Finalizar agora"}
-            </Button>
-
-            <p className={styles.finishHint}>
-              Questões sem resposta não são contabilizadas como erros.
-            </p>
           </aside>
         </div>
       </section>
@@ -877,7 +1056,11 @@ export function SimulationRunner({
         <div
           className={styles.dialogBackdrop}
           onMouseDown={(event) => {
-            if (event.currentTarget === event.target && !isFinishing) {
+            if (
+              event.currentTarget === event.target &&
+              !isFinishing &&
+              !isConfirmingPending
+            ) {
               setShowFinishConfirm(false);
             }
           }}
@@ -908,22 +1091,50 @@ export function SimulationRunner({
                 <dt>Serão puladas</dt>
                 <dd>{pendingAtFinish}</dd>
               </div>
+              <div>
+                <dt>Marcadas e pendentes</dt>
+                <dd>{pendingSelectionCount}</dd>
+              </div>
             </dl>
 
             <div className={styles.finishRule}>
-              As {pendingAtFinish} questões sem resposta ficarão fora da
-              contagem de acertos e erros.
+              {pendingSelectionCount
+                ? "Confirme as questões marcadas antes de finalizar para não perder essas respostas."
+                : `As ${pendingAtFinish} questões sem resposta ficarão fora da contagem de acertos e erros.`}
             </div>
+
+            {dialogError ? (
+              <p className={styles.dialogError} role="alert">
+                {dialogError}
+              </p>
+            ) : null}
+
+            {pendingSelectionCount ? (
+              <div className={styles.pendingAction}>
+                <Button
+                  fullWidth
+                  loading={isConfirmingPending}
+                  loadingLabel="Confirmando questões pendentes"
+                  onClick={() => {
+                    void confirmPendingAnswers();
+                  }}
+                  variant="primary"
+                >
+                  Confirmar questões pendentes ({pendingSelectionCount})
+                </Button>
+              </div>
+            ) : null}
 
             <div className={styles.dialogActions}>
               <Button
-                disabled={isFinishing}
+                disabled={isFinishing || isConfirmingPending}
                 onClick={() => setShowFinishConfirm(false)}
                 variant="secondary"
               >
                 Continuar respondendo
               </Button>
               <Button
+                disabled={pendingSelectionCount > 0 || isConfirmingPending}
                 loading={isFinishing}
                 loadingLabel="Finalizando simulado"
                 onClick={() => {
@@ -932,6 +1143,98 @@ export function SimulationRunner({
                 variant="danger"
               >
                 Finalizar e ver resultado
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showPauseConfirm ? (
+        <div
+          className={styles.dialogBackdrop}
+          onMouseDown={(event) => {
+            if (
+              event.currentTarget === event.target &&
+              !isPausing &&
+              !isConfirmingPending
+            ) {
+              setShowPauseConfirm(false);
+            }
+          }}
+        >
+          <div
+            aria-describedby={`${idPrefix}-pause-description`}
+            aria-labelledby={`${idPrefix}-pause-title`}
+            aria-modal="true"
+            className={styles.finishDialog}
+            onKeyDown={handlePauseDialogKeyDown}
+            ref={pauseDialogRef}
+            role="dialog"
+            tabIndex={-1}
+          >
+            <p className={styles.eyebrow}>Pausar tentativa</p>
+            <h2 id={`${idPrefix}-pause-title`}>Fazer uma pausa?</h2>
+            <p id={`${idPrefix}-pause-description`}>
+              O cronômetro será congelado em{" "}
+              <strong>{formatSimulationTime(clock.seconds)}</strong>. Ao
+              retornar, você continuará deste mesmo ponto.
+            </p>
+
+            <dl className={styles.finishSummary}>
+              <div>
+                <dt>Respondidas</dt>
+                <dd>{answeredCount}</dd>
+              </div>
+              <div>
+                <dt>Marcadas e pendentes</dt>
+                <dd>{pendingSelectionCount}</dd>
+              </div>
+            </dl>
+
+            <div className={styles.finishRule}>
+              {pendingSelectionCount
+                ? "Há questões marcadas que ainda não foram salvas. Confirme-as antes de pausar."
+                : "Todas as respostas confirmadas já estão salvas. Você poderá retomar quando quiser."}
+            </div>
+
+            {dialogError ? (
+              <p className={styles.dialogError} role="alert">
+                {dialogError}
+              </p>
+            ) : null}
+
+            {pendingSelectionCount ? (
+              <div className={styles.pendingAction}>
+                <Button
+                  fullWidth
+                  loading={isConfirmingPending}
+                  loadingLabel="Confirmando questões pendentes"
+                  onClick={() => {
+                    void confirmPendingAnswers();
+                  }}
+                >
+                  Confirmar questões pendentes ({pendingSelectionCount})
+                </Button>
+              </div>
+            ) : null}
+
+            <div className={styles.dialogActions}>
+              <Button
+                disabled={isPausing || isConfirmingPending}
+                onClick={() => setShowPauseConfirm(false)}
+                variant="secondary"
+              >
+                Continuar respondendo
+              </Button>
+              <Button
+                disabled={pendingSelectionCount > 0 || isConfirmingPending}
+                loading={isPausing}
+                loadingLabel="Pausando simulado"
+                onClick={() => {
+                  void pauseSimulation();
+                }}
+              >
+                Pausar e sair
               </Button>
             </div>
           </div>

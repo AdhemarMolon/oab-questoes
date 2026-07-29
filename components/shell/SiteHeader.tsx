@@ -22,6 +22,7 @@ type SiteHeaderProps = {
 const publicNavigation: readonly AppHeaderNavItem[] = [
   { href: "/", label: "Início", match: "exact" },
   { href: "/como-funciona", label: "Como funciona", match: "exact" },
+  { href: "/estatisticas", label: "Estatísticas", match: "exact" },
   { href: "/planos", label: "Planos", match: "exact" },
 ];
 

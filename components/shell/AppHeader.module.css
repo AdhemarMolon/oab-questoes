@@ -45,7 +45,12 @@
 .brand:focus-visible,
 .navLink:focus-visible,
 .activeLink:focus-visible,
-.account:focus-visible {
+.account:focus-visible,
+.menuButton:focus-visible,
+.closeButton:focus-visible,
+.mobileNavLink:focus-visible,
+.mobileNavActive:focus-visible,
+.mobileAccount:focus-visible {
   outline: 3px solid rgb(184 149 85 / 48%);
   outline-offset: 3px;
 }
@@ -109,6 +114,31 @@
   min-width: 0;
 }
 
+.menuButton {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--oab-border, #c9b99d);
+  border-radius: 4px;
+  cursor: pointer;
+  display: none;
+  height: 2.75rem;
+  justify-items: center;
+  padding: 0.68rem;
+  width: 2.75rem;
+}
+
+.menuButton:hover {
+  border-color: var(--oab-wine, #8b1e2d);
+}
+
+.menuButton span {
+  background: var(--oab-wine, #8b1e2d);
+  display: block;
+  height: 2px;
+  width: 1.25rem;
+}
+
 .account {
   align-items: center;
   border: 1px solid var(--oab-border, #c9b99d);
@@ -165,6 +195,159 @@
   margin-top: 0.16rem;
 }
 
+.mobileBackdrop {
+  background: rgb(36 33 30 / 46%);
+  inset: 0;
+  position: fixed;
+  z-index: 100;
+}
+
+.mobileDrawer {
+  background:
+    radial-gradient(circle at 100% 0, rgb(184 149 85 / 9%), transparent 16rem),
+    #fffdf8;
+  box-shadow: -16px 0 42px rgb(36 33 30 / 18%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  margin-left: auto;
+  max-width: 27rem;
+  overflow: hidden;
+  width: 100%;
+}
+
+.mobileDrawerHeader {
+  align-items: center;
+  border-bottom: 1px solid var(--oab-border, #c9b99d);
+  display: flex;
+  justify-content: space-between;
+  min-height: 5rem;
+  padding: 0.75rem 1.25rem;
+}
+
+.closeButton {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--oab-wine, #8b1e2d);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 2.2rem;
+  height: 2.75rem;
+  justify-content: center;
+  line-height: 1;
+  width: 2.75rem;
+}
+
+.closeButton:hover {
+  background: rgb(139 30 45 / 7%);
+}
+
+.mobileNavigation {
+  align-content: start;
+  display: grid;
+  gap: 0.35rem;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.mobileNavLink,
+.mobileNavActive {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--oab-ink, #24211e);
+  display: grid;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.96rem;
+  font-weight: 700;
+  gap: 0.9rem;
+  grid-template-columns: 2.75rem 1fr auto;
+  min-height: 4rem;
+  padding: 0.55rem 0.75rem;
+  text-decoration: none;
+}
+
+.mobileNavLink:hover,
+.mobileNavActive {
+  background: #f8f0e3;
+  border-color: rgb(184 149 85 / 38%);
+  color: var(--oab-wine, #8b1e2d);
+}
+
+.mobileNavIcon {
+  align-items: center;
+  background: var(--oab-wine, #8b1e2d);
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+  height: 2.75rem;
+  justify-content: center;
+  width: 2.75rem;
+}
+
+.mobileNavActive .mobileNavIcon {
+  background: var(--oab-ink, #24211e);
+}
+
+.mobileNavArrow {
+  color: #9d8e7c;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+}
+
+.mobileFooter {
+  background: #f8f0e3;
+  border-top: 1px solid var(--oab-border, #c9b99d);
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem 1.25rem max(1rem, env(safe-area-inset-bottom));
+}
+
+.mobileAccount {
+  align-items: center;
+  color: var(--oab-ink, #24211e);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto 1fr auto;
+  min-width: 0;
+  padding: 0.25rem 0;
+  text-decoration: none;
+}
+
+.mobileAccount .userCopy {
+  display: grid;
+}
+
+.mobileFooterActions {
+  min-width: 0;
+}
+
+.mobileFooterActions > * {
+  align-items: stretch;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
+.mobileFooterActions > * > :only-child {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.mobileFooterActions a,
+.mobileFooterActions button {
+  justify-content: center;
+  text-align: center;
+}
+
 @media (max-width: 1180px) {
   .header {
     gap: 0.7rem 1rem;
@@ -192,26 +375,27 @@
   }
 }
 
-@media (max-width: 580px) {
+@media (min-width: 721px) {
+  .mobileBackdrop {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
   .header {
+    gap: 1rem;
+    grid-template-columns: 1fr auto;
+    min-height: 4.5rem;
     padding-inline: 1rem;
   }
 
-  .navigation {
-    column-gap: 0.9rem;
-    flex-wrap: wrap;
-    overflow-x: visible;
-    row-gap: 0;
+  .navigation,
+  .desktopActions {
+    display: none;
   }
 
-  .navLink,
-  .activeLink {
-    min-height: 2rem;
-  }
-
-  .navLink::after,
-  .activeLink::after {
-    bottom: -0.15rem;
+  .menuButton {
+    display: grid;
   }
 
   .brand {

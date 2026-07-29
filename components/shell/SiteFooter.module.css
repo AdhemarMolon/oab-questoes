@@ -1,0 +1,145 @@
+.footer {
+  color: #f5ead9;
+  border-top: 3px solid var(--gold);
+  background:
+    radial-gradient(circle at 12% 0, rgb(181 139 67 / 12%), transparent 20rem),
+    #29221e;
+}
+
+.inner {
+  width: min(1240px, calc(100% - 36px));
+  margin-inline: auto;
+  padding: 38px 0 22px;
+}
+
+.primary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: clamp(30px, 6vw, 82px);
+  align-items: center;
+  padding-bottom: 31px;
+}
+
+.identity {
+  display: grid;
+  gap: 10px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: baseline;
+  justify-self: start;
+  gap: 8px;
+  font: 400 15px var(--font-serif);
+}
+
+.brand strong {
+  padding-bottom: 2px;
+  border-bottom: 2px solid var(--gold);
+  font-size: 25px;
+}
+
+.brand span {
+  color: #e2b969;
+}
+
+.identity p {
+  max-width: 290px;
+  margin: 0;
+  color: #bfb1a3;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px clamp(18px, 3vw, 34px);
+  justify-content: center;
+}
+
+.navigation a {
+  color: #cfc2b4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.navigation a:hover {
+  color: #fff7e9;
+}
+
+.accessLink {
+  padding: 12px 15px;
+  color: #29221e;
+  background: #e2b969;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.accessLink:hover {
+  background: #f0cb83;
+}
+
+.secondary {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 18px;
+  color: #95877b;
+  border-top: 1px solid #51463e;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legalNavigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 20px;
+  justify-content: flex-end;
+}
+
+.legalNavigation a:hover {
+  color: #f5ead9;
+}
+
+@media (max-width: 760px) {
+  .inner {
+    width: min(100% - 28px, 1240px);
+    padding-top: 31px;
+  }
+
+  .primary {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    align-items: start;
+  }
+
+  .navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: start;
+  }
+
+  .navigation a {
+    min-height: 30px;
+  }
+
+  .accessLink {
+    justify-self: start;
+  }
+
+  .secondary {
+    display: grid;
+    line-height: 1.5;
+  }
+
+  .legalNavigation {
+    justify-content: start;
+  }
+}
