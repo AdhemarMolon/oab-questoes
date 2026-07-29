@@ -14,6 +14,7 @@ import {
   type AttemptQuestionSnapshot,
 } from "@/db/schema";
 import { canAccessSimulation, type ResolvedAccess } from "@/lib/access";
+import { orderSimulationsByNewestEdition } from "@/lib/simulation-catalog";
 import { calculateSimulationScore } from "@/lib/simulation-attempt";
 
 const OPTION_LABELS = ["A", "B", "C", "D"] as const;
@@ -69,9 +70,10 @@ export async function listAvailableSimulations(userId: string, access: ResolvedA
     ? latestBySimulation.get(claimedFreeAttempt.simulationId) ??
       claimedFreeAttempt
     : null;
+  const orderedCatalog = orderSimulationsByNewestEdition(catalog);
 
   return {
-    simulations: catalog.map((simulation) => ({
+    simulations: orderedCatalog.map((simulation) => ({
       ...simulation,
       available: canAccessSimulation(access, simulation.access),
       latestAttempt: latestBySimulation.get(simulation.id) ?? null,
