@@ -3,6 +3,7 @@ import "dotenv/config";
 import { asc, eq, inArray } from "drizzle-orm";
 
 import { questions as legacyQuestions } from "../app/questions-data";
+import { archiveQuestions } from "../app/questions-archive-data";
 import { getDb } from "../db";
 import {
   exams,
@@ -35,7 +36,8 @@ async function seed() {
   }
 
   const database = getDb();
-  const subjectNames = [...new Set(legacyQuestions.map((question) => question.subject))];
+  const allQuestions = [...archiveQuestions, ...legacyQuestions];
+  const subjectNames = [...new Set(allQuestions.map((question) => question.subject))];
 
   await database
     .insert(subjects)
@@ -44,15 +46,26 @@ async function seed() {
 
   const subjectRows = await database.select().from(subjects);
   const subjectByName = new Map(subjectRows.map((subject) => [subject.name, subject.id]));
-  const examData = [...new Map(legacyQuestions.map((question) => [question.exam, question.year])).entries()]
+  const examData = [
+    ...new Map(
+      allQuestions.map((question) => [
+        question.exam,
+        {
+          year: question.year,
+          bookletCode: question.bookletCode ?? "TYPE_1",
+          bookletName: question.bookletName ?? "Tipo 1 — Branca",
+        },
+      ]),
+    ).entries(),
+  ]
     .sort(([left], [right]) => left - right)
-    .map(([edition, year]) => ({
+    .map(([edition, details]) => ({
       edition,
-      year,
+      year: details.year,
       phase: 1,
       title: `${edition}º Exame de Ordem`,
-      bookletCode: "TYPE_1",
-      bookletName: "Tipo 1 — Branca",
+      bookletCode: details.bookletCode,
+      bookletName: details.bookletName,
       status: "PUBLISHED" as const,
       publishedAt: new Date(),
     }));
@@ -64,7 +77,7 @@ async function seed() {
 
   const examRows = await database.select().from(exams);
   const examByEdition = new Map(examRows.map((exam) => [exam.edition, exam.id]));
-  const questionValues = legacyQuestions.map((question) => {
+  const questionValues = allQuestions.map((question) => {
     const examId = examByEdition.get(question.exam);
     const subjectId = subjectByName.get(question.subject);
     if (!examId || !subjectId) throw new Error(`Relacionamento ausente para ${question.id}.`);
@@ -77,8 +90,10 @@ async function seed() {
       options: question.options,
       correctAnswer: question.annulled ? null : question.answer,
       annulled: question.annulled,
-      verificationStatus: "UNVERIFIED" as const,
-      source: "Acervo inicial importado — fonte documental a confirmar",
+      verificationStatus: question.sourceUrl ? ("VERIFIED" as const) : ("UNVERIFIED" as const),
+      source: question.source,
+      sourceUrl: question.sourceUrl,
+      sourcePage: question.sourcePage,
       status: "PUBLISHED" as const,
       publishedAt: new Date(),
     };
