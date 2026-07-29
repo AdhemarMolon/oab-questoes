@@ -359,15 +359,27 @@
 }
 
 .score {
+  position: relative;
+  isolation: isolate;
   display: grid;
   place-content: center;
   width: 94px;
   height: 94px;
   text-align: center;
-  border: 7px solid #d4b67f;
-  border-top-color: var(--brand);
   border-radius: 50%;
+  background: conic-gradient(
+    var(--brand) 0 var(--score),
+    #d4b67f var(--score) 100%
+  );
+}
+
+.score::before {
+  position: absolute;
+  z-index: -1;
+  inset: 7px;
+  border-radius: inherit;
   background: var(--surface);
+  content: "";
 }
 
 .score strong {

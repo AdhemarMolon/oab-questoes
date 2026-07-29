@@ -3,8 +3,12 @@ import Link from "next/link";
 
 import { SiteFooter } from "@/components/shell";
 import { SiteHeader } from "@/components/shell/SiteHeader";
+import { getBillingCatalog } from "@/lib/billing/config";
 
+import { CheckoutButton } from "./CheckoutButton";
 import styles from "./page.module.css";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Planos",
@@ -14,23 +18,29 @@ export const metadata: Metadata = {
 
 const plans = [
   {
+    code: "MONTHLY",
     name: "Mensal",
     eyebrow: "Flexibilidade",
     billing: "Cobrança mensal",
+    discount: null,
     description: "Para estudar no seu ritmo, sem compromisso de longo prazo.",
     featured: false,
   },
   {
+    code: "ANNUAL",
     name: "Anual",
     eyebrow: "Melhor escolha",
     billing: "Cobrança anual",
+    discount: "20% de desconto",
     description: "Para manter uma preparação contínua ao longo de todo o ano.",
     featured: true,
   },
   {
+    code: "LIFETIME",
     name: "Vitalício",
     eyebrow: "Acesso permanente",
     billing: "Pagamento único",
+    discount: null,
     description: "Para ter o conteúdo sempre disponível, sem renovação.",
     featured: false,
   },
@@ -44,6 +54,12 @@ const benefits = [
 ] as const;
 
 export default function PlansPage() {
+  const billingCatalog = getBillingCatalog();
+  const currency = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+
   return (
     <main className={styles.page} id="main-content">
       <SiteHeader />
@@ -101,13 +117,29 @@ export default function PlansPage() {
 
               <div className={styles.price}>
                 <span>VALOR</span>
-                <strong>Em breve</strong>
+                <strong>
+                  {billingCatalog.find((item) => item.plan === plan.code)
+                    ?.amountCents
+                    ? currency.format(
+                        billingCatalog.find((item) => item.plan === plan.code)!
+                          .amountCents! / 100,
+                      )
+                    : "Em breve"}
+                </strong>
                 <small>{plan.billing}</small>
+                {plan.discount ? (
+                  <b className={styles.discount}>{plan.discount}</b>
+                ) : null}
               </div>
 
-              <button className={styles.cardAction} disabled type="button">
-                Disponível em breve
-              </button>
+              <CheckoutButton
+                configured={
+                  billingCatalog.find((item) => item.plan === plan.code)
+                    ?.configured ?? false
+                }
+                featured={plan.featured}
+                plan={plan.code}
+              />
 
               <div className={styles.benefitBlock}>
                 <span>ACESSO COMPLETO INCLUI</span>
@@ -131,13 +163,13 @@ export default function PlansPage() {
             </span>
             <p>
               <strong>Pagamento seguro</strong>
-              <small>Ambiente protegido no lançamento</small>
+              <small>Checkout protegido pela AbacatePay</small>
             </p>
           </div>
           <i aria-hidden="true" />
           <p>
-            Os preços ainda estão em definição. Você pode criar sua conta agora
-            e começar pelo acesso gratuito.
+            A liberação do acesso acontece automaticamente após a confirmação
+            do pagamento.
           </p>
         </footer>
       </section>

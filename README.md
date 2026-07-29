@@ -20,7 +20,9 @@ MVP de uma plataforma de estudos para a 1ª fase da OAB, construído para evolui
   - comunicados globais e segmentados;
   - CRUD de questões com exclusão lógica;
   - trilha de auditoria.
-- Estrutura de billing e webhooks preparada para a futura integração AbacatePay.
+- Checkout e assinaturas integrados à API v2 da AbacatePay.
+- Webhook assinado e idempotente para liberar, renovar e encerrar acessos.
+- Histórico de cobranças e cancelamento de assinatura na conta do aluno.
 
 ## Stack
 
@@ -56,6 +58,14 @@ BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+ABACATEPAY_API_KEY=
+ABACATEPAY_WEBHOOK_SECRET=
+ABACATEPAY_MONTHLY_PRODUCT_ID=
+ABACATEPAY_MONTHLY_PRICE_CENTS=
+ABACATEPAY_ANNUAL_PRODUCT_ID=
+ABACATEPAY_ANNUAL_PRICE_CENTS=
+ABACATEPAY_LIFETIME_PRODUCT_ID=
+ABACATEPAY_LIFETIME_PRICE_CENTS=
 ```
 
 `BETTER_AUTH_SECRET` deve ter pelo menos 32 caracteres de alta entropia. Nenhuma variável secreta deve usar o prefixo `NEXT_PUBLIC_`.
@@ -135,15 +145,39 @@ npm run build
 
 ## Pagamentos
 
-O checkout real ainda não está ativo porque preços e regras comerciais serão definidos depois. O schema já separa:
+A integração usa a API v2 da AbacatePay:
 
-- pedidos;
-- assinaturas;
-- eventos de webhook idempotentes;
-- grants de assinatura/compra;
-- grants de presente/administração.
+- mensal e anual são produtos recorrentes criados com ciclos `MONTHLY` e
+  `ANNUALLY`;
+- vitalício é um produto avulso, sem ciclo;
+- os preços são configurados em centavos e devem ser exatamente iguais aos
+  valores cadastrados nos produtos da AbacatePay;
+- o navegador apenas inicia o checkout; somente um webhook autenticado libera
+  acesso.
 
-Quando a AbacatePay for conectada, o webhook validado deve atualizar billing e grants no servidor. O navegador nunca poderá conceder acesso diretamente.
+No painel da AbacatePay, crie o webhook:
+
+```text
+https://www.minhaoab.com.br/api/webhooks/abacatepay
+```
+
+Use o mesmo valor de `ABACATEPAY_WEBHOOK_SECRET` no campo `secret` e assine os
+eventos:
+
+```text
+checkout.completed
+checkout.refunded
+checkout.disputed
+checkout.lost
+subscription.completed
+subscription.renewed
+subscription.payment_failed
+subscription.cancelled
+```
+
+A AbacatePay acrescenta `?webhookSecret=...` automaticamente. O endpoint também
+valida `X-Webhook-Signature` com HMAC-SHA256, registra cada evento e processa
+retentativas de forma idempotente.
 
 ## Deploy futuro
 

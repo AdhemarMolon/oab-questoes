@@ -1,0 +1,2 @@
+ALTER TABLE "access_grants" DROP CONSTRAINT "access_grants_revocation_valid";--> statement-breakpoint
+ALTER TABLE "access_grants" ADD CONSTRAINT "access_grants_revocation_valid" CHECK ("access_grants"."revoked_at" is null or ("access_grants"."revocation_reason" is not null and ("access_grants"."revoked_by_user_id" is not null or "access_grants"."source" in ('SUBSCRIPTION', 'PURCHASE'))));

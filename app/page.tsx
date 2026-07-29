@@ -1,17 +1,100 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 
 import { SiteFooter } from "@/components/shell";
 import { SiteHeader } from "@/components/shell/SiteHeader";
+import { getUserAccess } from "@/lib/data/access";
+import { getDashboardData } from "@/lib/data/dashboard";
+import { getCurrentSession } from "@/lib/session";
 
 import styles from "./page.module.css";
 
-const progress = [
-  ["Ética Profissional", "82%"],
-  ["Direito Constitucional", "71%"],
-  ["Direito Civil", "59%"],
-] as const;
+export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+async function getHomeData() {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return {
+      session: null,
+      dashboard: null,
+      progress: [
+        { label: "Questões respondidas", value: "—", width: 0 },
+        { label: "Respostas corretas", value: "—", width: 0 },
+        { label: "Simulados concluídos", value: "—", width: 0 },
+      ],
+      progressTitle: "ENTRE PARA VER SEU DESEMPENHO",
+    };
+  }
+
+  const access = await getUserAccess(session.user.id);
+  const dashboard = await getDashboardData(
+    session.user.id,
+    access.hasFullAccess,
+  );
+  const basicProgress = [
+    {
+      label: "Questões respondidas",
+      value: String(dashboard.summary.answeredQuestions),
+      width: dashboard.summary.answeredQuestions > 0 ? 100 : 0,
+    },
+    {
+      label: "Respostas corretas",
+      value: String(dashboard.summary.correctAnswers),
+      width: dashboard.summary.accuracy,
+    },
+    {
+      label: "Simulados concluídos",
+      value: String(dashboard.summary.completedAttempts),
+      width:
+        dashboard.summary.attempts > 0
+          ? Math.round(
+              (dashboard.summary.completedAttempts /
+                dashboard.summary.attempts) *
+                100,
+            )
+          : 0,
+    },
+  ];
+  const subjectProgress = dashboard.subjectPerformance
+    .slice(0, 3)
+    .map((subject) => ({
+        label: subject.subject,
+        value: `${subject.accuracy}%`,
+        width: subject.accuracy,
+      }));
+  const hasSubjectProgress =
+    access.hasFullAccess && subjectProgress.length > 0;
+  const progress = hasSubjectProgress ? subjectProgress : basicProgress;
+
+  return {
+    session,
+    dashboard,
+    progress,
+    progressTitle: hasSubjectProgress
+      ? "DESEMPENHO POR MATÉRIA"
+      : "RESUMO DA SUA ATIVIDADE",
+  };
+}
+
+export default async function HomePage() {
+  const home = await getHomeData();
+  const firstName =
+    home.session?.user.name.trim().split(/\s+/)[0] || "estudante";
+  const summary = home.dashboard?.summary;
+  const latestAttempt = home.dashboard?.recentAttempts[0] ?? null;
+  const activeAttempt =
+    home.dashboard?.recentAttempts.find(
+      (attempt) => attempt.status === "IN_PROGRESS",
+    ) ?? null;
+  const completedAttempt =
+    home.dashboard?.recentAttempts.find(
+      (attempt) => attempt.status === "SUBMITTED",
+    ) ?? null;
+  const hasAnswers = Boolean(summary?.scoredQuestions);
+  const accuracy = summary?.accuracy ?? 0;
+  const destination = home.session ? "/painel" : "/entrar";
+
   return (
     <main className={styles.page} id="main-content">
       <SiteHeader />
@@ -31,8 +114,9 @@ export default function HomePage() {
           </p>
 
           <div className={styles.actions}>
-            <Link className={styles.primaryAction} href="/entrar">
-              Fazer simulado gratuito <span aria-hidden="true">→</span>
+            <Link className={styles.primaryAction} href={destination}>
+              {home.session ? "Ir para meu painel" : "Fazer simulado gratuito"}{" "}
+              <span aria-hidden="true">→</span>
             </Link>
             <Link className={styles.secondaryAction} href="/como-funciona">
               Conhecer a plataforma
@@ -54,43 +138,103 @@ export default function HomePage() {
             <header>
               <div>
                 <span>SEU PAINEL</span>
-                <strong>Visão geral</strong>
+                <strong>
+                  {home.session ? `Olá, ${firstName}` : "Visão geral"}
+                </strong>
               </div>
-              <b>Sincronizado</b>
+              <b>{home.session ? "Sincronizado" : "Prévia"}</b>
             </header>
 
             <div className={styles.summary}>
-              <div className={styles.score}>
-                <strong>68%</strong>
+              <div
+                className={styles.score}
+                style={{ "--score": `${accuracy}%` } as CSSProperties}
+              >
+                <strong>{home.session && hasAnswers ? `${accuracy}%` : "—"}</strong>
                 <span>de acertos</span>
               </div>
               <div className={styles.summaryCopy}>
-                <span>ÚLTIMO SIMULADO</span>
-                <strong>54 de 80 questões</strong>
-                <small>Continue de onde parou, em qualquer dispositivo.</small>
+                <span>
+                  {latestAttempt ? "ÚLTIMO SIMULADO" : "SEU PROGRESSO"}
+                </span>
+                <strong>
+                  {!home.session
+                    ? "Entre para acompanhar"
+                    : latestAttempt?.status === "SUBMITTED"
+                      ? `${latestAttempt.correctAnswers ?? 0} de ${latestAttempt.totalQuestions} questões`
+                      : latestAttempt?.status === "IN_PROGRESS"
+                        ? "Tentativa em andamento"
+                        : latestAttempt
+                          ? "Tentativa encerrada"
+                        : "Nenhum simulado iniciado"}
+                </strong>
+                <small>
+                  {latestAttempt
+                    ? latestAttempt.title
+                    : home.session
+                      ? "Comece seu primeiro diagnóstico."
+                      : "Seus resultados aparecem aqui após o login."}
+                </small>
               </div>
             </div>
 
             <div className={styles.subjects}>
-              <span className={styles.listTitle}>DESEMPENHO POR MATÉRIA</span>
-              {progress.map(([subject, value]) => (
-                <div className={styles.subjectRow} key={subject}>
-                  <span>{subject}</span>
-                  <i><b style={{ width: value }} /></i>
-                  <strong>{value}</strong>
+              <span className={styles.listTitle}>{home.progressTitle}</span>
+              {home.progress.map((item) => (
+                <div className={styles.subjectRow} key={item.label}>
+                  <span>{item.label}</span>
+                  <i><b style={{ width: `${item.width}%` }} /></i>
+                  <strong>{item.value}</strong>
                 </div>
               ))}
             </div>
           </section>
 
           <section className={styles.questionCard}>
-            <div className={styles.questionNumber}>23</div>
-            <div>
-              <span>SIMULADO EM ANDAMENTO</span>
-              <strong>Direito Constitucional</strong>
-              <small>Questão 23 de 80</small>
+            <div className={styles.questionNumber}>
+              {activeAttempt ? "↻" : completedAttempt ? "✓" : "01"}
             </div>
-            <Link href="/entrar" aria-label="Continuar simulado">→</Link>
+            <div>
+              <span>
+                {activeAttempt
+                  ? activeAttempt.pausedAt
+                    ? "SIMULADO EM PAUSA"
+                    : "SIMULADO EM ANDAMENTO"
+                  : completedAttempt
+                    ? "ÚLTIMO RESULTADO"
+                    : "PRONTO PARA COMEÇAR"}
+              </span>
+              <strong>
+                {activeAttempt?.title ??
+                  completedAttempt?.title ??
+                  "Seu primeiro simulado"}
+              </strong>
+              <small>
+                {activeAttempt
+                  ? `Progresso salvo · ${activeAttempt.totalQuestions} questões`
+                  : completedAttempt
+                    ? `${completedAttempt.correctAnswers ?? 0} acertos em ${completedAttempt.totalQuestions}`
+                    : home.session
+                      ? "Escolha uma prova e comece agora"
+                      : "Entre para salvar seu progresso"}
+              </small>
+            </div>
+            <Link
+              href={
+                activeAttempt
+                  ? `/simulados/${activeAttempt.id}`
+                  : completedAttempt
+                    ? `/simulados/${completedAttempt.id}/resultado`
+                    : home.session
+                      ? "/simulados"
+                      : "/entrar"
+              }
+              aria-label={
+                activeAttempt ? "Continuar simulado" : "Abrir área de simulados"
+              }
+            >
+              →
+            </Link>
           </section>
         </div>
       </section>

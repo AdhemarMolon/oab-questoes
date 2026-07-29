@@ -1,0 +1,122 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 70dvh;
+  padding: clamp(48px, 8vw, 90px) 18px;
+}
+
+.card {
+  width: min(680px, 100%);
+  padding: clamp(28px, 5vw, 52px);
+  border: 1px solid var(--border);
+  border-top: 5px solid var(--gold);
+  background: var(--surface);
+  box-shadow: 0 24px 65px rgba(62, 43, 28, 0.1);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.card p {
+  margin: 0;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.card h1 {
+  margin: 20px 0 12px;
+  font: 600 clamp(36px, 6vw, 54px) / 1.04 var(--font-serif);
+  letter-spacing: -0.045em;
+}
+
+.card > span {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.card dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 32px 0 0;
+  border-block: 1px solid var(--border);
+}
+
+.card dl > div {
+  padding: 17px;
+  border-right: 1px solid var(--border);
+}
+
+.card dl > div:last-child {
+  border-right: 0;
+}
+
+.card dt {
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.card dd {
+  margin: 7px 0 0;
+  font: 600 17px var(--font-serif);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 27px;
+}
+
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 43px;
+  padding: 0 17px;
+  color: white;
+  background: var(--brand);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.actions a + a {
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  background: transparent;
+}
+
+.card small {
+  display: block;
+  margin-top: 18px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+@media (max-width: 560px) {
+  .card dl {
+    grid-template-columns: 1fr;
+  }
+
+  .card dl > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card dl > div:last-child {
+    border-bottom: 0;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

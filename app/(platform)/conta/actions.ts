@@ -2,6 +2,7 @@
 
 import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
 import {
@@ -15,9 +16,43 @@ import {
   verification,
 } from "@/db/schema";
 import { requireUser } from "@/lib/session";
+import { getCancelableSubscriptions } from "@/lib/billing/data";
+import {
+  cancelUserSubscription,
+  SubscriptionCancellationError,
+} from "@/lib/billing/subscriptions";
 
-function accountError(message: string): never {
-  redirect(`/conta?erro=${encodeURIComponent(message)}#excluir-conta`);
+function accountError(message: string, anchor = "excluir-conta"): never {
+  redirect(`/conta?erro=${encodeURIComponent(message)}#${anchor}`);
+}
+
+export async function cancelOwnSubscriptionAction(formData: FormData) {
+  const currentSession = await requireUser();
+  const subscriptionId = formData.get("subscriptionId");
+
+  if (
+    typeof subscriptionId !== "string" ||
+    !/^[0-9a-f-]{36}$/i.test(subscriptionId)
+  ) {
+    accountError("Assinatura inválida.", "cobrancas");
+  }
+
+  try {
+    await cancelUserSubscription(currentSession.user.id, subscriptionId);
+  } catch (error) {
+    if (error instanceof SubscriptionCancellationError) {
+      accountError(error.message, "cobrancas");
+    }
+
+    console.error("Failed to cancel AbacatePay subscription", error);
+    accountError(
+      "Não foi possível cancelar a assinatura agora. Tente novamente ou fale com o suporte.",
+      "cobrancas",
+    );
+  }
+
+  revalidatePath("/conta");
+  redirect("/conta?assinatura=cancelada#cobrancas");
 }
 
 export async function deleteOwnAccountAction(formData: FormData) {
@@ -67,6 +102,21 @@ export async function deleteOwnAccountAction(formData: FormData) {
     if (Number(administratorRows[0]?.total ?? 0) <= 1) {
       accountError(
         "O último administrador não pode excluir a própria conta. Promova outro administrador primeiro.",
+      );
+    }
+  }
+
+  const activeSubscriptions = await getCancelableSubscriptions(target.id);
+  for (const subscription of activeSubscriptions) {
+    try {
+      await cancelUserSubscription(target.id, subscription.id);
+    } catch (error) {
+      console.error(
+        "Failed to cancel subscription before account deletion",
+        error,
+      );
+      accountError(
+        "Não foi possível cancelar sua assinatura ativa. Cancele-a na seção de cobranças ou fale com o suporte antes de excluir a conta.",
       );
     }
   }

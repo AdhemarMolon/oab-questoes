@@ -48,8 +48,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Acesso e cobrança:</strong> plano, concessões de acesso e,
-            quando os pagamentos forem ativados, informações da transação. A
-            plataforma não pretende armazenar os dados completos do cartão.
+            nas compras, identificadores, valor e situação da transação. A
+            plataforma não armazena os dados completos do cartão.
           </li>
           <li>
             <strong>Atendimento:</strong> conteúdo das mensagens enviadas pelos
@@ -82,7 +82,8 @@ export default function PrivacyPage() {
         <p>
           Os dados podem ser processados por fornecedores indispensáveis à
           operação, como Google para autenticação, Neon para banco de dados,
-          serviços de hospedagem e, futuramente, o provedor de pagamentos.
+          serviços de hospedagem e AbacatePay para processar pagamentos,
+          assinaturas, cancelamentos e reembolsos.
           Esses fornecedores recebem somente os dados necessários às suas
           funções e estão sujeitos às próprias políticas e obrigações legais.
         </p>

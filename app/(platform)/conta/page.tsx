@@ -3,17 +3,37 @@ import Link from "next/link";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Badge } from "@/components/ui";
+import { getUserBillingSummary } from "@/lib/billing/data";
 import { getUserAccess } from "@/lib/data/access";
 import { requireUser } from "@/lib/session";
 
-import { deleteOwnAccountAction } from "./actions";
+import {
+  cancelOwnSubscriptionAction,
+  deleteOwnAccountAction,
+} from "./actions";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Minha conta" };
 
 type AccountSearchParams = {
   erro?: string | string[];
+  assinatura?: string | string[];
 };
+
+const PLAN_LABELS = {
+  FREE: "Gratuito",
+  MONTHLY: "Mensal",
+  ANNUAL: "Anual",
+  LIFETIME: "Vitalício",
+} as const;
+
+const ORDER_STATUS_LABELS = {
+  PENDING: "Pendente",
+  PAID: "Pago",
+  FAILED: "Falhou",
+  EXPIRED: "Expirou",
+  REFUNDED: "Reembolsado",
+} as const;
 
 export default async function AccountPage({
   searchParams,
@@ -21,10 +41,21 @@ export default async function AccountPage({
   searchParams: Promise<AccountSearchParams>;
 }) {
   const [session, params] = await Promise.all([requireUser(), searchParams]);
-  const access = await getUserAccess(session.user.id);
+  const [access, billing] = await Promise.all([
+    getUserAccess(session.user.id),
+    getUserBillingSummary(session.user.id),
+  ]);
   const errorMessage = Array.isArray(params.erro)
     ? params.erro[0]
     : params.erro;
+  const subscriptionMessage = params.assinatura
+    ? "Assinatura cancelada. As próximas cobranças foram interrompidas."
+    : null;
+  const activeSubscriptions = billing.subscriptions.filter(
+    (subscription) =>
+      subscription.status === "ACTIVE" ||
+      subscription.status === "PAST_DUE",
+  );
 
   return (
     <main className={styles.page} id="main-content">
@@ -37,6 +68,11 @@ export default async function AccountPage({
       {errorMessage ? (
         <p className={styles.errorMessage} role="alert">
           {errorMessage}
+        </p>
+      ) : null}
+      {subscriptionMessage ? (
+        <p className={styles.successMessage} role="status">
+          {subscriptionMessage}
         </p>
       ) : null}
 
@@ -64,8 +100,96 @@ export default async function AccountPage({
       </div>
 
       <section className={styles.note}>
-        <strong>Cobranças ainda não estão ativas.</strong>
-        <p>A estrutura distingue mensal, anual, vitalício e presente. O gerenciamento financeiro será conectado quando os preços e a integração com a AbacatePay forem definidos.</p>
+        <strong>Pagamentos protegidos pela AbacatePay.</strong>
+        <p>
+          A confirmação, as renovações e os cancelamentos são sincronizados
+          automaticamente com o seu acesso à plataforma.
+        </p>
+      </section>
+
+      <section className={styles.billingPanel} id="cobrancas">
+        <div className={styles.billingIntro}>
+          <div>
+            <span>COBRANÇAS</span>
+            <h2>Assinaturas e pagamentos</h2>
+          </div>
+          <Link href="/planos">Ver planos</Link>
+        </div>
+
+        {activeSubscriptions.length ? (
+          <div className={styles.subscriptionList}>
+            {activeSubscriptions.map((subscription) => (
+              <article key={subscription.id}>
+                <div>
+                  <Badge
+                    variant={
+                      subscription.status === "ACTIVE" ? "success" : "info"
+                    }
+                  >
+                    {subscription.status === "ACTIVE"
+                      ? "Ativa"
+                      : "Pagamento pendente"}
+                  </Badge>
+                  <h3>
+                    Assinatura {PLAN_LABELS[subscription.plan]}
+                  </h3>
+                  {subscription.currentPeriodEnd ? (
+                    <p>
+                      Ciclo atual até{" "}
+                      {new Intl.DateTimeFormat("pt-BR").format(
+                        subscription.currentPeriodEnd,
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+                <details>
+                  <summary>Cancelar assinatura</summary>
+                  <form action={cancelOwnSubscriptionAction}>
+                    <input
+                      name="subscriptionId"
+                      type="hidden"
+                      value={subscription.id}
+                    />
+                    <p>
+                      O cancelamento é imediato, encerra o acesso deste plano e
+                      interrompe cobranças futuras.
+                    </p>
+                    <button type="submit">Confirmar cancelamento</button>
+                  </form>
+                </details>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.noSubscription}>
+            Você não possui assinatura recorrente ativa.
+          </p>
+        )}
+
+        {billing.orders.length ? (
+          <div className={styles.orderList}>
+            <h3>Pagamentos recentes</h3>
+            <div>
+              {billing.orders.map((order) => (
+                <article key={order.id}>
+                  <div>
+                    <strong>{PLAN_LABELS[order.plan]}</strong>
+                    <span>
+                      {new Intl.DateTimeFormat("pt-BR").format(order.createdAt)}
+                    </span>
+                  </div>
+                  <span>{ORDER_STATUS_LABELS[order.status]}</span>
+                  <strong>
+                    {new Intl.NumberFormat("pt-BR", {
+                      style: "currency",
+                      currency: order.currency,
+                    }).format(order.amountCents / 100)}
+                  </strong>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className={styles.privacyPanel}>

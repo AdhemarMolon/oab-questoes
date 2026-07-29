@@ -65,13 +65,21 @@ export default function TermsPage() {
         <h2>4. Acesso gratuito e planos</h2>
         <p>
           O acesso gratuito e os recursos incluídos são informados nas páginas
-          da plataforma. Os planos pagos ainda não estão ativos. Antes do
-          lançamento comercial serão apresentados preços, periodicidade,
-          renovação, formas de cancelamento e regras de reembolso.
+          da plataforma. Os preços, a periodicidade e a modalidade de cada
+          plano pago são apresentados antes da abertura do checkout.
         </p>
         <p>
-          Quando houver cobrança, os direitos assegurados pela legislação de
-          consumo permanecerão aplicáveis independentemente destes Termos.
+          Os planos mensal e anual são recorrentes e renovados automaticamente
+          até o cancelamento. O plano vitalício consiste em um pagamento único.
+          Assinaturas podem ser canceladas em <a href="/conta">Minha conta</a>;
+          conforme informado na confirmação, o cancelamento é imediato e
+          interrompe as cobranças futuras e o acesso ligado à assinatura.
+        </p>
+        <p>
+          Os pagamentos são processados pela AbacatePay. A liberação depende da
+          confirmação enviada pelo provedor. Reembolsos, arrependimento e demais
+          direitos assegurados pela legislação de consumo permanecem aplicáveis
+          independentemente destes Termos.
         </p>
       </section>
 

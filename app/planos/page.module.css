@@ -274,19 +274,55 @@
   font-size: 9px;
 }
 
-.cardAction {
-  margin: 20px clamp(21px, 2.5vw, 32px) 0;
-  color: #877c70;
-  border: 1px solid #d4c7b5;
-  background: #eee7dc;
-  cursor: not-allowed;
+.price .discount {
+  padding: 5px 9px;
+  color: #216b45;
+  border: 1px solid rgba(38, 114, 74, 0.32);
+  border-radius: 999px;
+  background: rgba(38, 114, 74, 0.07);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.featuredCard .cardAction {
+.cardAction {
+  width: 100%;
+  margin: 0;
   color: white;
-  border-color: var(--brand);
+  border: 1px solid var(--brand);
   background: var(--brand);
-  opacity: 0.62;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.cardAction:hover:not(:disabled) {
+  background: var(--brand-dark);
+  transform: translateY(-1px);
+}
+
+.cardAction:disabled {
+  color: #877c70;
+  border-color: #d4c7b5;
+  background: #eee7dc;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.checkoutForm {
+  display: grid;
+  gap: 8px;
+  margin: 20px clamp(21px, 2.5vw, 32px) 0;
+}
+
+.checkoutError {
+  margin: 0;
+  color: var(--danger);
+  font-size: 9px;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .benefitBlock {

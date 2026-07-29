@@ -493,7 +493,7 @@ export const accessGrants = pgTable(
     ),
     check(
       "access_grants_revocation_valid",
-      sql`${table.revokedAt} is null or (${table.revokedByUserId} is not null and ${table.revocationReason} is not null)`,
+      sql`${table.revokedAt} is null or (${table.revocationReason} is not null and (${table.revokedByUserId} is not null or ${table.source} in ('SUBSCRIPTION', 'PURCHASE')))`,
     ),
   ],
 );
