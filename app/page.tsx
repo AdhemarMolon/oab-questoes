@@ -3,8 +3,10 @@ import Link from "next/link";
 
 import { SiteFooter } from "@/components/shell";
 import { SiteHeader } from "@/components/shell/SiteHeader";
+import { DailyQuestion } from "@/components/study/DailyQuestion";
 import { getUserAccess } from "@/lib/data/access";
 import { getDashboardData } from "@/lib/data/dashboard";
+import { getDailyQuestion } from "@/lib/data/questions";
 import { getCurrentSession } from "@/lib/session";
 
 import styles from "./page.module.css";
@@ -12,12 +14,16 @@ import styles from "./page.module.css";
 export const dynamic = "force-dynamic";
 
 async function getHomeData() {
-  const session = await getCurrentSession();
+  const [session, dailyQuestion] = await Promise.all([
+    getCurrentSession(),
+    getDailyQuestion(),
+  ]);
 
   if (!session) {
     return {
       session: null,
       dashboard: null,
+      dailyQuestion,
       progress: [
         { label: "Questões respondidas", value: "—", width: 0 },
         { label: "Respostas corretas", value: "—", width: 0 },
@@ -70,6 +76,7 @@ async function getHomeData() {
   return {
     session,
     dashboard,
+    dailyQuestion,
     progress,
     progressTitle: hasSubjectProgress
       ? "DESEMPENHO POR MATÉRIA"
@@ -238,6 +245,12 @@ export default async function HomePage() {
           </section>
         </div>
       </section>
+      {home.dailyQuestion ? (
+        <DailyQuestion
+          moreQuestionsHref={home.session ? "/questoes" : "/entrar?next=/questoes"}
+          question={home.dailyQuestion}
+        />
+      ) : null}
       <SiteFooter />
     </main>
   );

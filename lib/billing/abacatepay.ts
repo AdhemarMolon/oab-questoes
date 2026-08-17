@@ -89,7 +89,7 @@ export async function createAbacatePayCheckout(input: {
       ? "/subscriptions/create"
       : "/checkouts/create";
   const methods =
-    input.plan.kind === "SUBSCRIPTION" ? ["CARD"] : ["PIX", "CARD"];
+    input.plan.kind === "SUBSCRIPTION" ? ["CARD"] : ["PIX"];
 
   const checkout = await requestAbacatePay<CheckoutResponse>(path, {
     items: [{ id: input.plan.productId, quantity: 1 }],

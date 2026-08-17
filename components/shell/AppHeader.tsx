@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import styles from "./AppHeader.module.css";
 
@@ -113,8 +114,19 @@ export function AppHeader({
 
   const brand = (
     <>
-      <span className={styles.brandMark}>Minha</span>
-      <span>{brandLabel}</span>
+      <Image
+        alt=""
+        aria-hidden="true"
+        className={styles.brandLogo}
+        height={46}
+        preload
+        src="/brand/minha-oab-mark.png"
+        width={46}
+      />
+      <span className={styles.brandCopy}>
+        <strong>Minha</strong>
+        <span>{brandLabel}</span>
+      </span>
     </>
   );
 

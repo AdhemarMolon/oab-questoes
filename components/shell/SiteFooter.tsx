@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import styles from "./SiteFooter.module.css";
 
@@ -16,8 +17,18 @@ export function SiteFooter() {
         <div className={styles.primary}>
           <div className={styles.identity}>
             <Link aria-label="Minha OAB — início" className={styles.brand} href="/">
-              <strong>Minha</strong>
-              <span>OAB</span>
+              <Image
+                alt=""
+                aria-hidden="true"
+                className={styles.brandLogo}
+                height={48}
+                src="/brand/minha-oab-mark.png"
+                width={48}
+              />
+              <span className={styles.brandCopy}>
+                <strong>Minha</strong>
+                <span>OAB</span>
+              </span>
             </Link>
             <p>Preparação clara e organizada para a 1ª fase.</p>
           </div>

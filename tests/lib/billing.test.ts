@@ -91,6 +91,46 @@ describe("AbacatePay API", () => {
     });
   });
 
+  it("creates a one-time checkout using PIX without requiring card support", async () => {
+    vi.stubEnv("ABACATEPAY_API_KEY", "test_api_key");
+    vi.stubEnv("BETTER_AUTH_URL", "https://www.minhaoab.com.br");
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        success: true,
+        error: null,
+        data: {
+          id: "bill_lifetime",
+          externalId: "order-lifetime",
+          url: "https://app.abacatepay.com/pay/bill_lifetime",
+          amount: 14990,
+          status: "PENDING",
+          devMode: true,
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createAbacatePayCheckout({
+      orderId: "order-lifetime",
+      userId: "user-123",
+      plan: {
+        plan: "LIFETIME",
+        name: "Vitalício",
+        billingLabel: "Pagamento único",
+        kind: "ONE_TIME",
+        productId: "prod_lifetime",
+        amountCents: 14990,
+      },
+    });
+
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.abacatepay.com/v2/checkouts/create");
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      externalId: "order-lifetime",
+      methods: ["PIX"],
+    });
+  });
+
   it("rejects a checkout when the provider price differs", async () => {
     vi.stubEnv("ABACATEPAY_API_KEY", "test_api_key");
     vi.stubEnv("BETTER_AUTH_URL", "https://www.minhaoab.com.br");

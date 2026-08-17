@@ -20,17 +20,21 @@
   text-decoration: none;
 }
 
-.brandMark {
-  border-bottom: 2px solid #d4ad69;
-  font-size: 1.65rem;
-  font-weight: 700;
-  line-height: 1;
+.brandLogo {
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .brand > span:last-child {
   display: grid;
   font-size: 1rem;
   line-height: 1.1;
+}
+
+.brand strong {
+  font-weight: 700;
 }
 
 .brand small {

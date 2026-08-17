@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { AbacatePayApiError } from "@/lib/billing/abacatepay";
 import { createCheckoutForUser } from "@/lib/billing/checkout";
 import {
   BillingConfigurationError,
@@ -42,6 +43,16 @@ export async function startCheckoutAction(
   } catch (error) {
     if (error instanceof BillingConfigurationError) {
       return { error: error.message };
+    }
+
+    if (
+      error instanceof AbacatePayApiError &&
+      error.message.toLowerCase().includes("card is not available")
+    ) {
+      return {
+        error:
+          "Os pagamentos recorrentes por cartão ainda não foram habilitados pela AbacatePay para esta loja.",
+      };
     }
 
     console.error("Failed to create AbacatePay checkout", error);

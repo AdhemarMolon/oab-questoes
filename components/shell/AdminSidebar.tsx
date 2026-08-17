@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import styles from "./AdminSidebar.module.css";
 
@@ -43,9 +44,16 @@ export function AdminSidebar({
   return (
     <aside aria-label="Menu administrativo" className={styles.sidebar}>
       <Link className={styles.brand} href={dashboardHref}>
-        <span className={styles.brandMark}>Minha</span>
+        <Image
+          alt=""
+          aria-hidden="true"
+          className={styles.brandLogo}
+          height={46}
+          src="/brand/minha-oab-mark.png"
+          width={46}
+        />
         <span>
-          OAB
+          <strong>Minha OAB</strong>
           <small>Administração</small>
         </span>
       </Link>

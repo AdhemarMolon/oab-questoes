@@ -1,10 +1,62 @@
-import { and, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { exams, questions, subjects } from "@/db/schema";
+import { getBrasiliaDateKey } from "@/lib/daily-question";
 import { getOffset, normalizePage } from "@/lib/pagination";
 
 export const QUESTION_PAGE_SIZE = 20;
+
+export async function getDailyQuestion(now = new Date()) {
+  const dateKey = getBrasiliaDateKey(now);
+  const database = getDb();
+  const [question] = await database
+    .select({
+      id: questions.id,
+      externalId: questions.externalId,
+      number: questions.number,
+      statement: questions.statement,
+      options: questions.options,
+      correctAnswer: questions.correctAnswer,
+      explanation: questions.explanation,
+      source: questions.source,
+      sourceUrl: questions.sourceUrl,
+      subject: subjects.name,
+      exam: exams.title,
+    })
+    .from(questions)
+    .innerJoin(subjects, eq(subjects.id, questions.subjectId))
+    .innerJoin(exams, eq(exams.id, questions.examId))
+    .where(
+      and(
+        eq(questions.status, "PUBLISHED"),
+        eq(questions.verificationStatus, "VERIFIED"),
+        eq(questions.annulled, false),
+        isNotNull(questions.correctAnswer),
+        isNull(questions.deletedAt),
+      ),
+    )
+    .orderBy(sql`md5(${questions.id}::text || ${dateKey})`)
+    .limit(1);
+
+  if (!question?.correctAnswer) return null;
+
+  return {
+    ...question,
+    correctAnswer: question.correctAnswer,
+    dateKey,
+  };
+}
 
 export async function listPublishedQuestions(filters: {
   page?: string | number;
