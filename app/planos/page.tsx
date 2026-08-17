@@ -21,18 +21,18 @@ const plans = [
     code: "MONTHLY",
     name: "Mensal",
     eyebrow: "Flexibilidade",
-    billing: "Cobrança mensal",
+    billing: "PIX único · 30 dias",
     discount: null,
-    description: "Para estudar no seu ritmo, sem compromisso de longo prazo.",
+    description: "Acesso completo por 30 dias, sem renovação automática.",
     featured: false,
   },
   {
     code: "ANNUAL",
     name: "Anual",
     eyebrow: "Melhor escolha",
-    billing: "Cobrança anual",
+    billing: "PIX único · 1 ano",
     discount: "20% de desconto",
-    description: "Para manter uma preparação contínua ao longo de todo o ano.",
+    description: "Acesso completo por um ano, sem renovação automática.",
     featured: true,
   },
   {
@@ -75,8 +75,8 @@ export default function PlansPage() {
             Escolha como quer <em>se preparar.</em>
           </h1>
           <p>
-            Todos os planos completos liberam os mesmos recursos. O que muda é
-            apenas a forma de pagamento.
+            Todos os planos completos liberam os mesmos recursos. Mensal e anual
+            são pagos uma única vez via PIX, sem renovação automática.
           </p>
         </header>
 
@@ -137,7 +137,6 @@ export default function PlansPage() {
                   billingCatalog.find((item) => item.plan === plan.code)
                     ?.configured ?? false
                 }
-                featured={plan.featured}
                 plan={plan.code}
               />
 
@@ -163,7 +162,7 @@ export default function PlansPage() {
             </span>
             <p>
               <strong>Pagamento seguro</strong>
-              <small>Checkout protegido pela AbacatePay</small>
+              <small>PIX protegido pela AbacatePay</small>
             </p>
           </div>
           <i aria-hidden="true" />

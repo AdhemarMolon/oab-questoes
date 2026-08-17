@@ -1,0 +1,7 @@
+ALTER TABLE "access_grants" DROP CONSTRAINT "access_grants_source_links_valid";--> statement-breakpoint
+ALTER TABLE "access_grants" ADD CONSTRAINT "access_grants_source_links_valid" CHECK (
+        ("access_grants"."source" = 'FREE' and "access_grants"."plan" = 'FREE' and "access_grants"."billing_order_id" is null and "access_grants"."billing_subscription_id" is null and "access_grants"."granted_by_user_id" is null)
+        or ("access_grants"."source" = 'SUBSCRIPTION' and "access_grants"."plan" in ('MONTHLY', 'ANNUAL') and "access_grants"."billing_subscription_id" is not null and "access_grants"."billing_order_id" is null and "access_grants"."granted_by_user_id" is null)
+        or ("access_grants"."source" = 'PURCHASE' and "access_grants"."plan" in ('MONTHLY', 'ANNUAL', 'LIFETIME') and "access_grants"."billing_order_id" is not null and "access_grants"."billing_subscription_id" is null and "access_grants"."granted_by_user_id" is null)
+        or ("access_grants"."source" in ('GIFT', 'ADMIN') and "access_grants"."plan" <> 'FREE' and "access_grants"."billing_order_id" is null and "access_grants"."billing_subscription_id" is null and "access_grants"."granted_by_user_id" is not null)
+      );

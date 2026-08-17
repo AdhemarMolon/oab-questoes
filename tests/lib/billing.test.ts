@@ -10,7 +10,7 @@ import {
   BillingConfigurationError,
   getBillingPlanConfiguration,
 } from "@/lib/billing/config";
-import { parseAbacatePayWebhook } from "@/lib/billing/webhook";
+import { addBillingPeriod, parseAbacatePayWebhook } from "@/lib/billing/webhook";
 
 const PUBLIC_WEBHOOK_KEY =
   "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9";
@@ -22,13 +22,13 @@ afterEach(() => {
 
 describe("billing configuration", () => {
   it("requires both product id and a positive price in cents", () => {
-    vi.stubEnv("ABACATEPAY_MONTHLY_PRODUCT_ID", "prod_monthly");
+    vi.stubEnv("ABACATEPAY_MONTHLY_PIX_PRODUCT_ID", "prod_monthly_pix");
     vi.stubEnv("ABACATEPAY_MONTHLY_PRICE_CENTS", "2990");
 
     expect(getBillingPlanConfiguration("MONTHLY")).toMatchObject({
-      productId: "prod_monthly",
+      productId: "prod_monthly_pix",
       amountCents: 2990,
-      kind: "SUBSCRIPTION",
+      kind: "ONE_TIME",
     });
 
     vi.stubEnv("ABACATEPAY_MONTHLY_PRICE_CENTS", "29.90");
@@ -169,6 +169,11 @@ describe("AbacatePay API", () => {
 });
 
 describe("AbacatePay webhooks", () => {
+  it("grants exactly 30 days for a monthly PIX purchase", () => {
+    expect(addBillingPeriod(new Date("2026-01-31T12:00:00.000Z"), "MONTHLY"))
+      .toEqual(new Date("2026-03-02T12:00:00.000Z"));
+  });
+
   it("validates the documented HMAC signature", () => {
     const body = JSON.stringify({ id: "log_123", event: "checkout.completed" });
     const signature = createHmac("sha256", PUBLIC_WEBHOOK_KEY)

@@ -1,0 +1,49 @@
+.shell { display: grid; grid-template-columns: 238px minmax(0, 1fr); width: min(1480px, 100%); margin: 0 auto; }
+.sidebar { position: sticky; top: 0; align-self: start; min-height: 100vh; padding: 28px 16px 36px; border-right: 1px solid var(--border); background: #fbf8f2; }
+.sidebarTitle { display: grid; gap: 6px; padding: 0 10px 22px; border-bottom: 1px solid #e4d9ca; }
+.sidebarTitle span, .drawer small { color: var(--brand); font-size: 8px; font-weight: 900; letter-spacing: .16em; }
+.sidebarTitle strong, .drawer header strong { font: 600 20px/1.1 var(--font-serif); }
+.navigation { display: grid; gap: 20px; padding-top: 22px; }
+.group { display: grid; gap: 3px; }
+.group h2 { margin: 0 10px 7px; color: #8b8076; font-size: 8px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.link, .active { position: relative; display: grid; grid-template-columns: 21px minmax(0, 1fr); gap: 9px; align-items: center; min-height: 39px; padding: 8px 9px; color: #5e554e; font-size: 11px; font-weight: 750; border-radius: 3px; }
+.link svg, .active svg { color: #8e8175; }
+.link:hover { color: var(--brand); background: #f4ece1; }
+.active { color: var(--brand); background: #f2e5e2; }
+.active::before { position: absolute; left: -16px; width: 3px; height: 24px; background: var(--brand); content: ""; }
+.active svg { color: var(--brand); }
+.workspace { min-width: 0; }
+.breadcrumb { display: flex; gap: 8px; width: min(1180px, 100%); margin: 0 auto; padding: 24px clamp(18px, 4vw, 52px) 0; color: var(--text-muted); font-size: 10px; }
+.breadcrumb a:hover { color: var(--brand); }
+.breadcrumb strong { color: var(--text); }
+.mobileBar, .backdrop { display: none; }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .shell { grid-template-columns: 78px minmax(0, 1fr); }
+  .sidebar { padding-inline: 10px; }
+  .sidebarTitle { padding-inline: 3px; text-align: center; }
+  .sidebarTitle span { display: none; }
+  .sidebarTitle strong { font-size: 0; }
+  .sidebarTitle strong::after { content: "Estudos"; font-size: 12px; }
+  .group h2 { overflow: hidden; height: 1px; margin: 0; clip-path: inset(50%); }
+  .link, .active { grid-template-columns: 1fr; justify-items: center; min-height: 44px; padding: 10px; }
+  .link span, .active span { display: none; }
+  .active::before { left: -10px; }
+}
+@media (max-width: 760px) {
+  .shell { display: block; }
+  .sidebar { display: none; }
+  .mobileBar { display: flex; align-items: center; gap: 13px; padding: 13px 18px; border-bottom: 1px solid var(--border); background: #fbf8f2; }
+  .mobileBar > button { display: grid; gap: 4px; width: 38px; height: 38px; padding: 10px; border: 1px solid #d8cabc; background: white; }
+  .mobileBar > button span { height: 1px; background: var(--text); }
+  .mobileBar > div { display: grid; gap: 3px; }
+  .mobileBar small { color: var(--brand); font-size: 7px; font-weight: 900; letter-spacing: .16em; }
+  .mobileBar strong { font: 600 15px var(--font-serif); }
+  .breadcrumb { padding-top: 17px; }
+  .backdrop { position: fixed; inset: 0; z-index: 1000; display: block; background: rgb(25 18 15 / 48%); }
+  .drawer { width: min(310px, 88vw); height: 100%; padding: 20px 16px 30px; overflow-y: auto; background: #fbf8f2; box-shadow: 18px 0 50px rgb(0 0 0 / 18%); }
+  .drawer header { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 2px 7px 18px; border-bottom: 1px solid #e4d9ca; }
+  .drawer header > div { display: grid; gap: 5px; }
+  .drawer header button { width: 38px; height: 38px; color: var(--brand); border: 1px solid #d8cabc; background: white; font-size: 24px; }
+  .active::before { left: -16px; }
+}
+@media (prefers-reduced-motion: reduce) { .link { transition: none; } }

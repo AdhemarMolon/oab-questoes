@@ -27,7 +27,7 @@ const publicNavigation: readonly AppHeaderNavItem[] = [
 ];
 
 const authenticatedNavigation: readonly AppHeaderNavItem[] = [
-  { href: "/painel", label: "Painel", match: "exact" },
+  { href: "/painel", label: "Painel", match: "prefix" },
   { href: "/simulados", label: "Simulados", match: "prefix" },
   { href: "/questoes", label: "Questões", match: "prefix" },
 ];

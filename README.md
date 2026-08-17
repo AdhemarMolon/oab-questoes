@@ -61,8 +61,10 @@ GOOGLE_CLIENT_SECRET=
 ABACATEPAY_API_KEY=
 ABACATEPAY_WEBHOOK_SECRET=
 ABACATEPAY_MONTHLY_PRODUCT_ID=
+ABACATEPAY_MONTHLY_PIX_PRODUCT_ID=
 ABACATEPAY_MONTHLY_PRICE_CENTS=
 ABACATEPAY_ANNUAL_PRODUCT_ID=
+ABACATEPAY_ANNUAL_PIX_PRODUCT_ID=
 ABACATEPAY_ANNUAL_PRICE_CENTS=
 ABACATEPAY_LIFETIME_PRODUCT_ID=
 ABACATEPAY_LIFETIME_PRICE_CENTS=
@@ -147,8 +149,8 @@ npm run build
 
 A integração usa a API v2 da AbacatePay:
 
-- mensal e anual são produtos recorrentes criados com ciclos `MONTHLY` e
-  `ANNUALLY`;
+- mensal e anual usam produtos avulsos específicos para PIX, liberando
+  respectivamente 30 dias e 1 ano sem renovação automática;
 - vitalício é um produto avulso, sem ciclo;
 - os preços são configurados em centavos e devem ser exatamente iguais aos
   valores cadastrados nos produtos da AbacatePay;
@@ -174,6 +176,12 @@ subscription.renewed
 subscription.payment_failed
 subscription.cancelled
 ```
+
+As variáveis `ABACATEPAY_MONTHLY_PIX_PRODUCT_ID` e
+`ABACATEPAY_ANNUAL_PIX_PRODUCT_ID` devem apontar para produtos sem `cycle`.
+Os IDs recorrentes antigos podem ser mantidos para o histórico de assinaturas,
+mas não são usados por novos checkouts enquanto a loja não tiver recorrência
+habilitada.
 
 A AbacatePay acrescenta `?webhookSecret=...` automaticamente. O endpoint também
 valida `X-Webhook-Signature` com HMAC-SHA256, registra cada evento e processa

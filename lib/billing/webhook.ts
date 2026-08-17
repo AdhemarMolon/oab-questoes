@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   and,
+  desc,
   eq,
   isNull,
   lt,
@@ -64,13 +65,13 @@ function nestedRecord(record: UnknownRecord, key: string): UnknownRecord | null 
   return asRecord(record[key]);
 }
 
-function addBillingPeriod(date: Date, plan: PlanCode): Date {
+export function addBillingPeriod(date: Date, plan: PlanCode): Date {
   const result = new Date(date);
 
   if (plan === "ANNUAL") {
     result.setUTCFullYear(result.getUTCFullYear() + 1);
   } else if (plan === "MONTHLY") {
-    result.setUTCMonth(result.getUTCMonth() + 1);
+    result.setUTCDate(result.getUTCDate() + 30);
   } else {
     throw new Error(`Plan ${plan} does not have a recurring billing period.`);
   }
@@ -258,21 +259,38 @@ async function upsertSubscription(
   return subscription;
 }
 
-async function processLifetimeCompleted(
+async function processOneTimeCompleted(
   payload: AbacatePayWebhookPayload,
 ): Promise<void> {
   const checkout = getCheckout(payload);
   if (!checkout) throw new Error("Checkout event is missing checkout data.");
   const order = await findOrder(checkout);
   if (!order) throw new Error("Checkout does not match a local order.");
-  if (order.kind !== "ONE_TIME" || order.plan !== "LIFETIME") {
-    throw new Error(`Order ${order.id} is not a lifetime purchase.`);
+  if (order.kind !== "ONE_TIME") {
+    throw new Error(`Order ${order.id} is not a one-time purchase.`);
   }
 
   assertCheckoutMatchesOrder(payload, checkout, order);
 
   const database = getDb();
   const paidAt = asDate(checkout.updatedAt);
+  let startsAt = paidAt;
+  if (order.plan === "MONTHLY" || order.plan === "ANNUAL") {
+    const [latestGrant] = await database
+      .select({ endsAt: accessGrants.endsAt })
+      .from(accessGrants)
+      .where(
+        and(
+          eq(accessGrants.userId, order.userId),
+          isNull(accessGrants.revokedAt),
+          sql`${accessGrants.endsAt} is not null and ${accessGrants.endsAt} > ${paidAt}`,
+        ),
+      )
+      .orderBy(desc(accessGrants.endsAt))
+      .limit(1);
+    if (latestGrant?.endsAt) startsAt = latestGrant.endsAt;
+  }
+  const endsAt = order.plan === "LIFETIME" ? null : addBillingPeriod(startsAt, order.plan);
   await database
     .update(billingOrders)
     .set({
@@ -287,11 +305,12 @@ async function processLifetimeCompleted(
     .insert(accessGrants)
     .values({
       userId: order.userId,
-      plan: "LIFETIME",
+      plan: order.plan,
       source: "PURCHASE",
       billingOrderId: order.id,
-      startsAt: paidAt,
-      note: "Pagamento confirmado pela AbacatePay.",
+      startsAt,
+      endsAt,
+      note: order.plan === "LIFETIME" ? "Pagamento único confirmado pela AbacatePay." : "Pagamento PIX confirmado pela AbacatePay, sem renovação automática.",
       idempotencyKey: `abacatepay:purchase:${order.id}`,
     })
     .onConflictDoNothing({
@@ -515,7 +534,7 @@ async function processProviderEvent(
 ): Promise<boolean> {
   switch (payload.event) {
     case "checkout.completed":
-      await processLifetimeCompleted(payload);
+      await processOneTimeCompleted(payload);
       return false;
     case "checkout.refunded":
     case "checkout.disputed":

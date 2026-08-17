@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -103,6 +104,27 @@ export const auditActorTypeEnum = pgEnum("audit_actor_type", [
   "USER",
   "SYSTEM",
   "WEBHOOK",
+]);
+export const studyActivityTypeEnum = pgEnum("study_activity_type", [
+  "QUESTIONS",
+  "THEORY",
+  "REVIEW",
+  "SIMULATION",
+  "TIME",
+  "CUSTOM",
+]);
+export const studyGoalMetricEnum = pgEnum("study_goal_metric", [
+  "QUESTIONS",
+  "STUDY_MINUTES",
+  "SIMULATIONS",
+  "ACCURACY",
+  "SIMULATION_SCORE",
+]);
+export const studyGoalPeriodEnum = pgEnum("study_goal_period", [
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "UNTIL_DATE",
 ]);
 
 const timestamps = () => ({
@@ -487,7 +509,7 @@ export const accessGrants = pgTable(
       sql`
         (${table.source} = 'FREE' and ${table.plan} = 'FREE' and ${table.billingOrderId} is null and ${table.billingSubscriptionId} is null and ${table.grantedByUserId} is null)
         or (${table.source} = 'SUBSCRIPTION' and ${table.plan} in ('MONTHLY', 'ANNUAL') and ${table.billingSubscriptionId} is not null and ${table.billingOrderId} is null and ${table.grantedByUserId} is null)
-        or (${table.source} = 'PURCHASE' and ${table.plan} = 'LIFETIME' and ${table.billingOrderId} is not null and ${table.billingSubscriptionId} is null and ${table.grantedByUserId} is null)
+        or (${table.source} = 'PURCHASE' and ${table.plan} in ('MONTHLY', 'ANNUAL', 'LIFETIME') and ${table.billingOrderId} is not null and ${table.billingSubscriptionId} is null and ${table.grantedByUserId} is null)
         or (${table.source} in ('GIFT', 'ADMIN') and ${table.plan} <> 'FREE' and ${table.billingOrderId} is null and ${table.billingSubscriptionId} is null and ${table.grantedByUserId} is not null)
       `,
     ),
@@ -684,6 +706,172 @@ export const favorites = pgTable(
   ],
 );
 
+export const studyActivities = pgTable(
+  "study_activities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id").references(() => subjects.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 180 }).notNull(),
+    description: text("description"),
+    type: studyActivityTypeEnum("type").default("CUSTOM").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    estimatedMinutes: integer("estimated_minutes"),
+    targetQuestions: integer("target_questions"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps(),
+  },
+  (table) => [
+    index("study_activities_user_schedule_idx").on(table.userId, table.scheduledAt),
+    check(
+      "study_activities_minutes_positive",
+      sql`${table.estimatedMinutes} is null or ${table.estimatedMinutes} > 0`,
+    ),
+    check(
+      "study_activities_questions_positive",
+      sql`${table.targetQuestions} is null or ${table.targetQuestions} > 0`,
+    ),
+  ],
+);
+
+export const studyGoals = pgTable(
+  "study_goals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 180 }).notNull(),
+    metric: studyGoalMetricEnum("metric").notNull(),
+    period: studyGoalPeriodEnum("period").notNull(),
+    targetValue: integer("target_value").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).defaultNow().notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    isActive: boolean("is_active").default(true).notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    index("study_goals_user_active_idx").on(table.userId, table.isActive),
+    check("study_goals_target_positive", sql`${table.targetValue} > 0`),
+    check(
+      "study_goals_dates_valid",
+      sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
+    ),
+  ],
+);
+
+export const questionStudyStates = pgTable(
+  "question_study_states",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    errorNote: text("error_note"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    nextReviewAt: timestamp("next_review_at", { withTimezone: true }),
+    reviewCycleDays: integer("review_cycle_days").default(1).notNull(),
+    removedFromErrorsAt: timestamp("removed_from_errors_at", { withTimezone: true }),
+    ...timestamps(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.questionId] }),
+    index("question_study_states_review_idx").on(table.userId, table.nextReviewAt),
+    check(
+      "question_study_states_cycle_valid",
+      sql`${table.reviewCycleDays} in (1, 7, 15, 30)`,
+    ),
+  ],
+);
+
+export const studyNotes = pgTable(
+  "study_notes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id").references(() => subjects.id, {
+      onDelete: "set null",
+    }),
+    questionId: uuid("question_id").references(() => questions.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 180 }).notNull(),
+    content: text("content").notNull(),
+    tags: jsonb("tags").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    isFavorite: boolean("is_favorite").default(false).notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    index("study_notes_user_updated_idx").on(table.userId, table.updatedAt),
+    index("study_notes_user_subject_idx").on(table.userId, table.subjectId),
+  ],
+);
+
+export const dailyStudyCompletions = pgTable(
+  "daily_study_completions",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    dateKey: date("date_key").notNull(),
+    itemKey: varchar("item_key", { length: 120 }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.dateKey, table.itemKey] }),
+    index("daily_study_completions_user_date_idx").on(table.userId, table.dateKey),
+  ],
+);
+
+export type StudyPlanSchedule = Array<{
+  weekday: number;
+  blocks: Array<{
+    kind: "THEORY" | "QUESTIONS" | "REVIEW" | "SIMULATION";
+    subject: string;
+    minutes: number;
+  }>;
+}>;
+
+export const studyPlans = pgTable(
+  "study_plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    examDate: date("exam_date").notNull(),
+    daysPerWeek: integer("days_per_week").notNull(),
+    minutesPerDay: integer("minutes_per_day").notNull(),
+    currentLevel: varchar("current_level", { length: 30 }).notNull(),
+    difficultSubjectIds: jsonb("difficult_subject_ids")
+      .$type<string[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    schedule: jsonb("schedule").$type<StudyPlanSchedule>().notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    check(
+      "study_plans_days_valid",
+      sql`${table.daysPerWeek} between 1 and 7`,
+    ),
+    check(
+      "study_plans_minutes_valid",
+      sql`${table.minutesPerDay} between 15 and 720`,
+    ),
+  ],
+);
+
 export const announcements = pgTable(
   "announcements",
   {
@@ -782,6 +970,12 @@ export const schema = {
   simulationAttemptQuestions,
   simulationAnswers,
   favorites,
+  studyActivities,
+  studyGoals,
+  questionStudyStates,
+  studyNotes,
+  dailyStudyCompletions,
+  studyPlans,
   announcements,
   announcementReceipts,
   auditLogs,

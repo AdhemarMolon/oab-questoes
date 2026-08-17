@@ -15,11 +15,9 @@ const initialCheckoutActionState: Awaited<
 
 export function CheckoutButton({
   configured,
-  featured,
   plan,
 }: {
   configured: boolean;
-  featured: boolean;
   plan: BillingPlanCode;
 }) {
   const [state, action, pending] = useActionState(
@@ -38,9 +36,7 @@ export function CheckoutButton({
         {pending
           ? "Abrindo pagamento…"
           : configured
-            ? featured
-              ? "Escolher melhor opção"
-              : "Escolher este plano"
+            ? "Pagar com PIX"
             : "Disponível em breve"}
       </button>
       {state.error ? (

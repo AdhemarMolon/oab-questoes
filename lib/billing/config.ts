@@ -24,13 +24,13 @@ const PLAN_DETAILS: Record<
 > = {
   MONTHLY: {
     name: "Mensal",
-    billingLabel: "Cobrança mensal",
-    kind: "SUBSCRIPTION",
+    billingLabel: "PIX único · 30 dias de acesso",
+    kind: "ONE_TIME",
   },
   ANNUAL: {
     name: "Anual",
-    billingLabel: "Cobrança anual",
-    kind: "SUBSCRIPTION",
+    billingLabel: "PIX único · 1 ano de acesso",
+    kind: "ONE_TIME",
   },
   LIFETIME: {
     name: "Vitalício",
@@ -52,12 +52,12 @@ function readPlanEnvironment(plan: BillingPlanCode): PlanEnvironment {
   switch (plan) {
     case "MONTHLY":
       return {
-        productId: process.env.ABACATEPAY_MONTHLY_PRODUCT_ID?.trim() ?? "",
+        productId: process.env.ABACATEPAY_MONTHLY_PIX_PRODUCT_ID?.trim() ?? "",
         price: process.env.ABACATEPAY_MONTHLY_PRICE_CENTS?.trim() ?? "",
       };
     case "ANNUAL":
       return {
-        productId: process.env.ABACATEPAY_ANNUAL_PRODUCT_ID?.trim() ?? "",
+        productId: process.env.ABACATEPAY_ANNUAL_PIX_PRODUCT_ID?.trim() ?? "",
         price: process.env.ABACATEPAY_ANNUAL_PRICE_CENTS?.trim() ?? "",
       };
     case "LIFETIME":

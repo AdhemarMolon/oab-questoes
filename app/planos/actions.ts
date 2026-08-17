@@ -45,13 +45,9 @@ export async function startCheckoutAction(
       return { error: error.message };
     }
 
-    if (
-      error instanceof AbacatePayApiError &&
-      error.message.toLowerCase().includes("card is not available")
-    ) {
+    if (error instanceof AbacatePayApiError) {
       return {
-        error:
-          "Os pagamentos recorrentes por cartão ainda não foram habilitados pela AbacatePay para esta loja.",
+        error: "O PIX não está disponível neste momento. Tente novamente em alguns instantes.",
       };
     }
 

@@ -16,7 +16,7 @@ export default function TermsPage() {
       description="Estas condições estabelecem as regras para criar uma conta e utilizar os conteúdos, simulados e estatísticas da Minha OAB."
       eyebrow="Condições do serviço"
       title="Termos de Uso"
-      updatedAt="28 de julho de 2026"
+      updatedAt="17 de agosto de 2026"
     >
       <section>
         <h2>1. Aceitação</h2>
@@ -69,11 +69,11 @@ export default function TermsPage() {
           plano pago são apresentados antes da abertura do checkout.
         </p>
         <p>
-          Os planos mensal e anual são recorrentes e renovados automaticamente
-          até o cancelamento. O plano vitalício consiste em um pagamento único.
-          Assinaturas podem ser canceladas em <a href="/conta">Minha conta</a>;
-          conforme informado na confirmação, o cancelamento é imediato e
-          interrompe as cobranças futuras e o acesso ligado à assinatura.
+          Os planos mensal e anual são compras avulsas via PIX, sem renovação
+          automática, e liberam respectivamente 30 dias e um ano de acesso. O
+          plano vitalício também consiste em um pagamento único, com acesso sem
+          prazo final. Assinaturas recorrentes contratadas anteriormente podem
+          ser administradas em <a href="/conta">Minha conta</a>.
         </p>
         <p>
           Os pagamentos são processados pela AbacatePay. A liberação depende da
