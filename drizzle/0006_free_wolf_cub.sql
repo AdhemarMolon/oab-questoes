@@ -1,0 +1,2 @@
+ALTER TABLE "billing_orders" DROP CONSTRAINT "billing_orders_plan_kind_valid";--> statement-breakpoint
+ALTER TABLE "billing_orders" ADD CONSTRAINT "billing_orders_plan_kind_valid" CHECK (("billing_orders"."plan" in ('MONTHLY', 'ANNUAL') and "billing_orders"."kind" in ('SUBSCRIPTION', 'ONE_TIME')) or ("billing_orders"."plan" = 'LIFETIME' and "billing_orders"."kind" = 'ONE_TIME'));

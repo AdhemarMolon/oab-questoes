@@ -375,7 +375,7 @@ export const billingOrders = pgTable(
     check("billing_orders_currency_upper", sql`${table.currency} = upper(${table.currency})`),
     check(
       "billing_orders_plan_kind_valid",
-      sql`(${table.plan} in ('MONTHLY', 'ANNUAL') and ${table.kind} = 'SUBSCRIPTION') or (${table.plan} = 'LIFETIME' and ${table.kind} = 'ONE_TIME')`,
+      sql`(${table.plan} in ('MONTHLY', 'ANNUAL') and ${table.kind} in ('SUBSCRIPTION', 'ONE_TIME')) or (${table.plan} = 'LIFETIME' and ${table.kind} = 'ONE_TIME')`,
     ),
   ],
 );

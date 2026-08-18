@@ -73,8 +73,9 @@ function Navigation({ pathname, hasAccess, close }: { pathname: string; hasAcces
       <h2>{group.label}</h2>
       {group.items.map((item) => {
         const active = item.href === "/painel" ? pathname === item.href : pathname.startsWith(item.href);
-        return <Link aria-current={active ? "page" : undefined} className={`${active ? styles.active : styles.link} ${!hasAccess ? styles.lockedLink : ""}`} href={hasAccess ? item.href : "/planos"} key={item.href} onClick={close}>
-          <Icon name={item.icon}/><span>{item.label}</span>{!hasAccess ? <LockTooltip/> : null}
+        const locked = !hasAccess && item.href !== "/painel";
+        return <Link aria-current={active ? "page" : undefined} className={`${active ? styles.active : styles.link} ${locked ? styles.lockedLink : ""}`} href={locked ? "/planos" : item.href} key={item.href} onClick={close}>
+          <Icon name={item.icon}/><span>{item.label}</span>{locked ? <LockTooltip/> : null}
         </Link>;
       })}
     </section>)}
@@ -104,7 +105,7 @@ export function PanelShell({ children, hasAccess }: { children: ReactNode; hasAc
         <div><small>PAINEL</small><strong>{label}</strong></div>
       </div>
       <div className={styles.breadcrumb} aria-label="Navegação estrutural"><Link href="/painel">Painel</Link><span>/</span><strong>{label}</strong></div>
-      {hasAccess ? children : <main className={styles.accessGate} id="main-content">
+      {hasAccess || pathname === "/painel" ? children : <main className={styles.accessGate} id="main-content">
         <section>
           <span className={styles.accessGateIcon}><LockTooltip/></span>
           <p>RECURSO DO ACESSO COMPLETO</p>

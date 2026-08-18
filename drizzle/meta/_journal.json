@@ -43,6 +43,13 @@
       "when": 1787010332831,
       "tag": "0005_dizzy_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787011821374,
+      "tag": "0006_free_wolf_cub",
+      "breakpoints": true
     }
   ]
 }
