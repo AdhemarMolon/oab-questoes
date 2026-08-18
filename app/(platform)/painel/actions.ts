@@ -15,14 +15,24 @@ import {
   studyPlans,
   type StudyPlanSchedule,
 } from "@/db/schema";
+import { getUserAccess } from "@/lib/data/access";
 import { getStudyAnalytics, listStudySubjects } from "@/lib/data/study";
-import { requireUser } from "@/lib/session";
+import { requireUser as requireAuthenticatedUser } from "@/lib/session";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => value || null);
 const optionalPositive = z
   .string()
   .transform((value) => (value ? Number(value) : null))
   .pipe(z.number().int().positive().nullable());
+
+async function requireUser() {
+  const session = await requireAuthenticatedUser();
+  const access = await getUserAccess(session.user.id);
+  if (!access.hasFullAccess) {
+    throw new Error("FULL_ACCESS_REQUIRED");
+  }
+  return session;
+}
 
 function revalidatePanel(path: string) {
   revalidatePath("/painel");

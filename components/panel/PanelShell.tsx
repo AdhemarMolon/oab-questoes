@@ -52,21 +52,36 @@ function currentLabel(pathname: string) {
   return groups.flatMap((group) => group.items).find((item) => item.href === pathname)?.label ?? "Visão Geral";
 }
 
-function Navigation({ pathname, close }: { pathname: string; close?: () => void }) {
+function LockTooltip() {
+  return <span
+    aria-label="Disponível apenas para usuários pagantes"
+    className={styles.lock}
+    data-tooltip="Disponível apenas para usuários pagantes."
+    role="img"
+    tabIndex={0}
+  >
+    <svg aria-hidden="true" fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="14">
+      <rect height="10" rx="2" width="16" x="4" y="11"/>
+      <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+    </svg>
+  </span>;
+}
+
+function Navigation({ pathname, hasAccess, close }: { pathname: string; hasAccess: boolean; close?: () => void }) {
   return <nav aria-label="Ferramentas do Painel" className={styles.navigation}>
     {groups.map((group) => <section className={styles.group} key={group.label}>
       <h2>{group.label}</h2>
       {group.items.map((item) => {
         const active = item.href === "/painel" ? pathname === item.href : pathname.startsWith(item.href);
-        return <Link aria-current={active ? "page" : undefined} className={active ? styles.active : styles.link} href={item.href} key={item.href} onClick={close}>
-          <Icon name={item.icon}/><span>{item.label}</span>
+        return <Link aria-current={active ? "page" : undefined} className={`${active ? styles.active : styles.link} ${!hasAccess ? styles.lockedLink : ""}`} href={hasAccess ? item.href : "/planos"} key={item.href} onClick={close}>
+          <Icon name={item.icon}/><span>{item.label}</span>{!hasAccess ? <LockTooltip/> : null}
         </Link>;
       })}
     </section>)}
   </nav>;
 }
 
-export function PanelShell({ children }: { children: ReactNode }) {
+export function PanelShell({ children, hasAccess }: { children: ReactNode; hasAccess: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -81,7 +96,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
   return <div className={styles.shell}>
     <aside className={styles.sidebar}>
       <div className={styles.sidebarTitle}><span>MINHA PREPARAÇÃO</span><strong>Central de estudos</strong></div>
-      <Navigation pathname={pathname}/>
+      <Navigation hasAccess={hasAccess} pathname={pathname}/>
     </aside>
     <div className={styles.workspace}>
       <div className={styles.mobileBar}>
@@ -89,12 +104,21 @@ export function PanelShell({ children }: { children: ReactNode }) {
         <div><small>PAINEL</small><strong>{label}</strong></div>
       </div>
       <div className={styles.breadcrumb} aria-label="Navegação estrutural"><Link href="/painel">Painel</Link><span>/</span><strong>{label}</strong></div>
-      {children}
+      {hasAccess ? children : <main className={styles.accessGate} id="main-content">
+        <section>
+          <span className={styles.accessGateIcon}><LockTooltip/></span>
+          <p>RECURSO DO ACESSO COMPLETO</p>
+          <h1>Sua central de estudos está protegida.</h1>
+          <strong>As ferramentas do Painel são exclusivas para usuários pagantes.</strong>
+          <span>Escolha um plano para liberar planejamento, revisões, anotações, métricas e todos os recursos da sidebar.</span>
+          <Link href="/planos">Conhecer os planos <span aria-hidden="true">→</span></Link>
+        </section>
+      </main>}
     </div>
     {open ? <div className={styles.backdrop} onMouseDown={(event) => event.currentTarget === event.target && setOpen(false)}>
       <aside aria-label="Menu de ferramentas do Painel" aria-modal="true" className={styles.drawer} role="dialog">
         <header><div><small>MINHA PREPARAÇÃO</small><strong>Central de estudos</strong></div><button aria-label="Fechar menu" onClick={() => setOpen(false)} type="button">×</button></header>
-        <Navigation close={() => setOpen(false)} pathname={pathname}/>
+        <Navigation close={() => setOpen(false)} hasAccess={hasAccess} pathname={pathname}/>
       </aside>
     </div> : null}
   </div>;
